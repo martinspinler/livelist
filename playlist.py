@@ -14,7 +14,7 @@ from pathlib import Path
 import lona
 import lona_bootstrap_5
 from lona import LonaView, LonaApp
-from lona.html import NumberInput, A, Span, HTML, H1, Div, Node, Widget, Tr, Td, Ul, Li, Hr, Ol, Nav, Img, Small
+from lona.html import NumberInput, TextInput, A, Span, HTML, H1, Div, Node, Widget, Tr, Td, Ul, Li, Hr, Ol, Nav, Img, Small
 from lona_bootstrap_5 import (
     BootstrapDiv,
     SecondaryButton,
@@ -146,6 +146,9 @@ class Database():
                 return False
             pl.pop(index)
             pl.insert(index + (-1 if new_index < 0 else 1), item)
+        else:
+            i = pl.pop(index)
+            pl.insert(new_index, item)
 
         self.save()
         return True
@@ -239,6 +242,7 @@ class SonglistPanel(Offcanvas):
     def __init__(self, on_song, _id):
         Offcanvas.__init__(self, _id)
         self.on_song_cb = on_song
+        self.use_keypad_filter = True
         self.kp = Keypad()
         self.kp.listeners.append(self.keypad_btns)
 
@@ -250,12 +254,24 @@ class SonglistPanel(Offcanvas):
         self.sort_alp = PrimaryButton(_class="bi bi-sort-alpha-down", handle_click=self.on_sort)
         self.sort_bpm = PrimaryButton(_class="bi bi-sort-numeric-down", handle_click=self.on_sort)
 
+        self.input_filter = TextInput(placeholder='Name', handle_change=self.on_kbf)
+
         self.kpfs = Small()
         self.set_title("Song list")
-        self.set_body(self.kp, Hr(), Div(self.sort_alp, self.sort_bpm, self.kpfs, _class="d-flex gap-2"), Hr(), self.div_song_list)
+        self.set_body(self.kp, self.input_filter, Hr(), Div(self.sort_alp, self.sort_bpm, self.kpfs, _class="d-flex gap-2"), Hr(), self.div_song_list)
 
         self.kpf = ""
         self.keypad_btns("C")
+
+    def on_kbf(self, ev):
+        if ev.data == "":
+            self.kpf = ""
+            self.use_keypad_filter = True
+            self._update_filter(self.kpf)
+        else:
+            self.kpf = ''.join(filter(lambda x: str.isalnum(x) or x in '\'" ', ev.data))
+            self.use_keypad_filter = False
+            self._update_filter(self.kpf)
 
     def on_sort(self, ev):
         n = [SonglistItem(db.songs[s], self.on_song_cb) for s in db.songs]
@@ -264,6 +280,10 @@ class SonglistPanel(Offcanvas):
         self.div_song_list.nodes = n
 
     def keypad_btns(self, key):
+        if not self.use_keypad_filter:
+            self.use_keypad_filter = True
+            self.kpf = ""
+
         if key == 'B':
             self.kpf = self.kpf[:-1]
         elif key == 'C':
@@ -272,11 +292,13 @@ class SonglistPanel(Offcanvas):
             self.kpf += key
         kf = "".join(["[" + Keypad.nummap[num] + "]" for num in self.kpf])
 
+        self._update_filter(kf)
         kb = {x[0]:x for x in Keypad.keypad_btns}
         self.kpfs.set_text("|".join([kb[num] for num in self.kpf]).replace(" ",""))
 
+    def _update_filter(self, filter_string):
         for n in self.div_song_list.nodes:
-            if re.search(kf, n.song.name, re.I) != None:
+            if re.search(filter_string, n.song.name, re.I) != None:
                 n.show()
                 #n.class_list.append("d-grid")
                 n.class_list.append("d-md-block")
@@ -301,6 +323,42 @@ class PlaylistView(MyLonaView):
         item = ev.node.parent.playlistItem
         db.set_currentPlaylistItem(self.currentPlaylist, item)
         self.trigger_view_event('play', {'playlistItem': item})
+
+    def on_sort(self, ev):
+        sort = ev.node
+        item = ev.node.parent #.playlistItem
+        if item in self.sort_items:
+            base_index = None
+
+            playlist = db.playlist[item.playlistItem.playlistId]
+            if item == self.sort_items[-1]:
+                base_index = playlist['items'].index(item.playlistItem)
+                # Place here
+            else:
+                base_index = playlist['items'].index(self.sort_items[0].playlistItem)
+            for ind,i in enumerate(self.sort_items):
+                s = i.nodes[1]
+                s.class_list.append("bi-sort-numeric-down")
+                s.class_list.append("btn-success")
+                s.class_list.remove("btn-primary")
+                s.set_text("")
+
+                #if base_index == None:
+                #base_index = playlist['items'].index(item.playlistItem)
+                db.playlistItemMove(i.playlistItem, base_index + ind)
+
+                #self.trigger_view_event('play', {'playlistItem': item})
+                self.trigger_view_event('update', {'playlistId': item.playlistItem.playlistId})
+
+            # Info: sort
+            return
+        self.sort_items.append(item)
+        sort.set_text(len(self.sort_items))
+        sort.class_list.remove("bi-sort-numeric-down")
+        sort.class_list.remove("btn-success")
+        sort.class_list.append("btn-primary")
+        #db.set_currentPlaylistItem(self.currentPlaylist, item)
+        #self.trigger_view_event('play', {'playlistItem': item})
 
     def on_recycle(self, ev):
         return
@@ -352,6 +410,7 @@ class PlaylistView(MyLonaView):
     def on_songlist(self, ev):
         song = ev.node.song
         pli = db.newPlaylistItem(self.currentPlaylist, song)
+        self.songlist.keypad_btns('C')
         self.trigger_view_event('add', {'playlistItem': pli})
         #self.fire_view_event('add', {'playlistItem': pli})
         #self.server.fire_view_event('add', {'playlistItem': item},
@@ -373,10 +432,13 @@ class PlaylistView(MyLonaView):
 
         li = Li(
             SuccessButton(_class="bi bi-play-fill", handle_click=self.on_play),
+            SuccessButton(_class="bi bi-sort-numeric-down sort_number", handle_click=self.on_sort),
             Div(song.name, _class="flex-grow-1"),
-            PrimaryButton(_class="bi bi-arrow-up btn-edit d-xxl-block", handle_click=self.on_up),
-            PrimaryButton(_class="bi bi-arrow-down btn-edit d-xxl-block", handle_click=self.on_down),
+            #PrimaryButton(_class="bi bi-arrow-up btn-edit d-xxl-block", handle_click=self.on_up),
+            #PrimaryButton(_class="bi bi-arrow-down btn-edit d-xxl-block", handle_click=self.on_down),
             SuccessButton(_class="bi bi-recycle btn-edit d-xxl-block", handle_click=self.on_recycle),
+            
+            # Info: sort
             DangerButton (_class="bi bi-trash btn-edit d-xxl-block", handle_click=self.on_delete),
             _class="list-group-item gap-3 d-flex")
 
@@ -400,9 +462,11 @@ class PlaylistView(MyLonaView):
         self._e_hidden = not self._e_hidden
 
     def handle_request(self, request):
+        self.set_title("Playlist")
         self._e_hidden = False
         self.playing = None
         self.currentPlaylist = None
+        self.sort_items = [] 
 
         self.playlist = Ul(_class="list-group gap-2", _id="playlist")
         self.songlist = sl = SonglistPanel(self.on_songlist, "songlistpanel")
@@ -410,7 +474,7 @@ class PlaylistView(MyLonaView):
         self.btn_play = A("Live", _class="btn btn-primary bi bi-file-play", attributes={'href': f'{proxy_path}/play/{self.currentPlaylist}', 'target': "_blank"})
         #print(type(self.btn_play), self.btn_play)
 
-        self.setCurrentPlaylist(1)
+        self.setCurrentPlaylist(2)
         self.populate_playlist()
         self.hide_edit(None)
 
@@ -427,11 +491,10 @@ class PlaylistView(MyLonaView):
             nav,
             self.songlist,
             self.playlistPanel,
-            self.playlist
+            self.playlist,
         )
 
         #self.songlist.show()
-
         self.show(html)
 
     def on_view_event(self, e):
@@ -638,26 +701,19 @@ class ClientMiddleware:
 def trigger_view_event(server, name, data, urls= ['/', '/client/', '/play/']):
     for url in urls:
         vc = server.get_view_class(url=proxy_path + url)
-        #print(vc)
         if vc:
             server.fire_view_event(name, data, view_classes=vc)
 
 class BootstrapThemeHTML(HTML):
     STATIC_FILES = [StyleSheet(
-            name='bootstrap-darkly',
-            path='static/bootstrap-darkly.min.css',
-        )]
+        name='bootstrap-darkly',
+        path='static/bootstrap-darkly.min.css',
+    )]
 
 app.add_template('lona/frontend.js', """
     lona_context.add_disconnect_hook(function(lona_context, event) {
-        document.querySelector('#lona').innerHTML = `
-            Server disconnected <br> Trying to reconnect...
-        `;
-
-        setTimeout(function() {
-            lona_context.reconnect();
-
-        }, 2000);
+        document.querySelector('#lona').innerHTML = `Server disconnected <br> Trying to reconnect...`;
+        setTimeout(function() {lona_context.reconnect();}, 2000);
     });
 """)
 

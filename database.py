@@ -35,7 +35,7 @@ class Song():
     @classmethod
     def from_yaml(cls, loader, node):
         s = cls()
-        attrs = ['id', 'name', 'file', 'store', 'notes', 'bpm']
+        attrs = ['id', 'name', 'file', 'store', 'notes', 'bpm', 'instruments']
         [setattr(s, x, node[x]) for x in attrs if x in node]
         [setattr(s, x, None) for x in attrs if x not in node]
 
@@ -68,14 +68,19 @@ class Database():
 
         self.config = yaml.load(open('config.yaml', 'r').read(), yaml.Loader)
 
-        songs = yaml.load(open('songs.yml', 'r').read(), yaml.Loader)
+        songs = yaml.load(open('songs.yaml', 'r').read(), yaml.Loader)
         self.songs = {int(s['id']):Song.from_yaml(None, s) for s in songs}
 
         for song in self.songs.values():
             store = (self.config['stores'][song.store]) if song.store != None else (self.config['stores'][self.config['defaultStore']])
             song.filename = self.config['prefixes'][store['prefix']] + store['path'] + song.file + store['suffix'] if song.file != None else None
 
-        self.playlist = yaml.load(open('playlist.yml', 'r').read(), yaml.Loader)
+            if 'format' in store:
+                song.prefix = self.config['prefixes'][store['prefix']]
+                song._format = store['format']
+                #song._format = song.format + store['path'] + song.file + store['suffix'] if song.file != None else None
+
+        self.playlist = yaml.load(open('playlist.yaml', 'r').read(), yaml.Loader)
         #print(self.playlist)
 
         for p in self.playlist.values():
@@ -93,11 +98,11 @@ class Database():
         self.save()
 
     def save(self):
-        with open('playlist.yml', 'w') as yaml_file:
+        with open('playlist.yaml', 'w') as yaml_file:
             yaml.dump(self.playlist, yaml_file, default_flow_style=False)
 
         # Temporary conversion
-        #with open('songs.yml', 'w') as yaml_file:
+        #with open('songs.yaml', 'w') as yaml_file:
         #    yaml.dump([Song.to_yaml(None, s) for s in self.songs.values()], yaml_file, default_flow_style=False, allow_unicode=True)
 
     def newPlaylistItem(self, pl, song):

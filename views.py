@@ -12,6 +12,7 @@ import subprocess
 from pathlib import Path
 
 import lona
+import lona.html
 import lona_bootstrap_5
 from lona import LonaView, LonaApp
 from lona.html import NumberInput, TextInput, A, Span, HTML, H1, Div, Node, Widget, Tr, Td, Ul, Li, Hr, Ol, Nav, Img, Small
@@ -91,7 +92,7 @@ class SonglistItem(Div):
         self.nodes = [
                 self.btn,
                 Span(str(song.played), _class="badge bg-primary rounded-pill float-end"),
-            ] + ([Span(song.bpm, _class="bi bi-music-note float-end")] if song.bpm else [])
+            ] + ([Span(f"{song.bpm}", _class="bi bi-music-note float-end")] if song.bpm else [])
 
 class SonglistPanel(Offcanvas):
     def __init__(self, on_song, _id):
@@ -131,7 +132,7 @@ class SonglistPanel(Offcanvas):
     def on_sort(self, ev):
         n = [SonglistItem(db.songs[s], self.on_song_cb) for s in db.songs]
         if ev and ev.node == self.sort_bpm:
-            n = sorted(n, key=lambda x: x.song.bpm)
+            n = sorted(n, key=lambda x: x.song.bpm if type(x.song.bpm) == int else 1000)
         self.div_song_list.nodes = n
 
     def keypad_btns(self, key):
@@ -167,10 +168,10 @@ class InstrumentSelector(Div):
         Div.__init__(self, _class="dropdown")
         self.nodes = HTML("""<button class="btn btn-secondary dropdown-toggle" type="button" id="dropdownMenu2" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">Instrument</button>
   <div class="dropdown-menu" aria-labelledby="dropdownMenu2">
-    <button class="dropdown-item" type="button">Piano</button>
-    <button class="dropdown-item disabled" type="button">Vocal</button>
-    <button class="dropdown-item disabled" type="button">Sax</button>
   </div>""")
+        self.menu = self.query_selector('div.dropdown-menu')
+        #print(dd.get_text())
+
 
 class PlaylistView(MyLonaView):
     def on_play(self, ev):
@@ -181,38 +182,42 @@ class PlaylistView(MyLonaView):
     def on_sort(self, ev):
         sort = ev.node
         item = ev.node.parent #.playlistItem
-        if item in self.sort_items:
-            base_index = None
+        if item not in self.sort_items:
+            self.sort_items.append(item)
 
-            playlist = db.playlist[item.playlistItem.playlistId]
-            if item == self.sort_items[-1]:
-                base_index = playlist['items'].index(item.playlistItem)
-                # Place here
-            else:
-                base_index = playlist['items'].index(self.sort_items[0].playlistItem)
-            for ind,i in enumerate(self.sort_items):
-                s = i.nodes[1]
+            sort.set_text(len(self.sort_items))
+            sort.class_list.remove("bi-sort-numeric-down")
+            sort.class_list.remove("btn-success")
+            sort.class_list.append("btn-primary" if len(self.sort_items) > 1 else "btn-warning" )
+            # + "bi-arrow-bar-down"
+        else:
+            # Update state: remove moving flags
+            for ind, i in enumerate(self.sort_items):
+                #s = i.nodes[1]
+                s = i.sort_btn
                 s.class_list.append("bi-sort-numeric-down")
                 s.class_list.append("btn-success")
                 s.class_list.remove("btn-primary")
+                #s.class_list.remove("bi-arrow-bar-down")
+                s.class_list.remove("btn-warning")
                 s.set_text("")
 
-                #if base_index == None:
-                #base_index = playlist['items'].index(item.playlistItem)
-                db.playlistItemMove(i.playlistItem, base_index + ind)
+            # TODO: Move handling to Database
+            playlist = db.playlist[item.playlistItem.playlistId]['items']
+            firstItem = self.sort_items.pop(0).playlistItem
+            # First item is anchor -> cancel action, don't move in this case
+            if item.playlistItem != firstItem:
+                #print(playlist, self.sort_items)
+                for i in self.sort_items:
+                    playlist.remove(i.playlistItem)
 
-                #self.trigger_view_event('play', {'playlistItem': item})
+                base_index = playlist.index(firstItem)
+                for i in reversed(self.sort_items):
+                    playlist.insert(base_index + 1, i.playlistItem)
+
+                db.save()
                 self.trigger_view_event('update', {'playlistId': item.playlistItem.playlistId})
-
-            # Info: sort
-            return
-        self.sort_items.append(item)
-        sort.set_text(len(self.sort_items))
-        sort.class_list.remove("bi-sort-numeric-down")
-        sort.class_list.remove("btn-success")
-        sort.class_list.append("btn-primary")
-        #db.set_currentPlaylistItem(self.currentPlaylist, item)
-        #self.trigger_view_event('play', {'playlistItem': item})
+            self.sort_items.clear()
 
     def on_recycle(self, ev):
         return
@@ -232,10 +237,6 @@ class PlaylistView(MyLonaView):
         item = ev.node.parent.playlistItem
         db.deletePlaylistItem(item)
         self.trigger_view_event('delete', {'playlistItem': item})
-        #self.fire_view_event('delete', {'playlistItem': item})
-
-        #self.server.fire_view_event('delete', {'playlistItem': item},
-        #        view_classes=self.server.get_view_class(url=proxy_path + '/client/'))
 
     def song_delete(self, pli):
         node = [x for x in self.playlist.nodes if x.playlistItem == pli]
@@ -266,9 +267,6 @@ class PlaylistView(MyLonaView):
         pli = db.newPlaylistItem(self.currentPlaylist, song)
         self.songlist.keypad_btns('C')
         self.trigger_view_event('add', {'playlistItem': pli})
-        #self.fire_view_event('add', {'playlistItem': pli})
-        #self.server.fire_view_event('add', {'playlistItem': item},
-        #        view_classes=self.server.get_view_class(url=proxy_path + '/client/'))
 
     def play_item(self, item):
         if self.playing:
@@ -285,13 +283,14 @@ class PlaylistView(MyLonaView):
             songNode[0].btn.class_list.append("btn-dark")
 
         li = Li(
+            Div(_class="btn rounded-pill bg-primary playlistitemnr"),
             SuccessButton(_class="bi bi-play-fill", handle_click=self.on_play),
             SuccessButton(_class="bi bi-sort-numeric-down sort_number", handle_click=self.on_sort),
             Div(song.name, _class="flex-grow-1"),
             #PrimaryButton(_class="bi bi-arrow-up btn-edit d-xxl-block", handle_click=self.on_up),
             #PrimaryButton(_class="bi bi-arrow-down btn-edit d-xxl-block", handle_click=self.on_down),
-            SuccessButton(_class="bi bi-recycle btn-edit d-xxl-block", handle_click=self.on_recycle),
-            
+            #SuccessButton(_class="bi bi-recycle btn-edit d-xxl-block", handle_click=self.on_recycle),
+
             # Info: sort
             DangerButton (_class="bi bi-trash btn-edit d-xxl-block", handle_click=self.on_delete),
             _class="list-group-item gap-3 d-flex")
@@ -299,6 +298,9 @@ class PlaylistView(MyLonaView):
         li.playlistItem = pli
         #self.playlist.nodes.insert(pli.pos, li) # CHECK
         self.playlist.nodes.append(li)
+
+        li.nodes[0].set_text(str(self.playlist.nodes.index(li) + 1))
+        li.sort_btn = li.nodes[2]
 
     def populate_playlist(self):
         self.playlist.nodes.clear()
@@ -320,7 +322,7 @@ class PlaylistView(MyLonaView):
         self._e_hidden = False
         self.playing = None
         self.currentPlaylist = None
-        self.sort_items = [] 
+        self.sort_items = []
 
         self.playlist = Ul(_class="list-group gap-2", _id="playlist")
         self.songlist = sl = SonglistPanel(self.on_songlist, "songlistpanel")
@@ -328,7 +330,7 @@ class PlaylistView(MyLonaView):
         self.btn_play = A("Live", _class="btn btn-primary bi bi-file-play", attributes={'href': f'{proxy_path}/play/{self.currentPlaylist}', 'target': "_blank"})
         #print(type(self.btn_play), self.btn_play)
 
-        self.setCurrentPlaylist(2)
+        self.setCurrentPlaylist(3)
         self.populate_playlist()
         self.hide_edit(None)
 
@@ -364,6 +366,7 @@ class PlaylistView(MyLonaView):
 
     def on_cleanup(self):
         pass
+
 
 class PlayView(MyLonaView):
     def on_forward(self, ev):
@@ -450,15 +453,39 @@ class PlayView(MyLonaView):
 
 
     def loadSong(self, playlistItem):
-        song = db.songs[playlistItem.songId]
+        if not hasattr(self, 'currentInstrument'):
+            self.currentInstrument = 'Piano'
+        self.currentPlaylistItem = playlistItem
+
+        self._currentSong = db.songs[playlistItem.songId]
+        song = self._currentSong
         self.currentSong.set_text(song.name)
         self.img.nodes = []
-        if song.filename == None or not os.path.isfile(song.filename):
+
+        if song.instruments:
+            for i in song.instruments:
+                self.instr_select.menu.nodes.append(lona.html.Button(i, _class="dropdown-item", handle_click=self.on_changeInstrument))
+        else:
+            self.instr_select.menu.nodes.clear()
+
+        self.loadSongInstrument(self.currentInstrument)
+
+    def loadSongInstrument(self, playlistItem):
+        song = self._currentSong
+        instrument = self.currentInstrument
+        filename = song._format.format(prefix=song.prefix, file=song.file, instrument=instrument) if hasattr(song, '_format') else song.filename
+        if filename == None or not os.path.isfile(filename):
+            self.img.nodes = [Div("No sheet")]
             return
 
-        pages = subprocess.check_output(f'pdfinfo "{song.filename}" |grep -a Pages:', shell = True).decode()
+        pages = subprocess.check_output(f'pdfinfo "{filename}" |grep -a Pages:', shell = True).decode()
         pages = int(pages.split(":")[1].strip())
-        self.img.nodes = [Img(attributes={'src': proxy_path + "/sheets/" + str(song.id) + f"-piano--{i+1}.jpg"}) for i in range(pages)]
+        self.img.nodes = [Img(attributes={'src': proxy_path + "/sheets/" + str(song.id) + f"-{instrument}--{i+1}.jpg"}) for i in range(pages)]
+
+
+    def on_changeInstrument(self, ev):
+        self.currentInstrument = ev.node.get_text()
+        self.loadSongInstrument(self.currentPlaylistItem)
 
 
 #@app.route(proxy_path + '/sheets/<song>', interactive=False)
@@ -468,7 +495,9 @@ class SheetView(MyLonaView):
         songId, instrument, mod, page, suffix = p.match(request.match_info['song']).groups()
         songId, page = int(songId), int(page)
 
-        fn = db.songs[songId].filename
+        song = db.songs[songId]
+
+        fn = song._format.format(prefix=song.prefix, file=song.file, instrument=instrument) if hasattr(song, '_format') else song.filename
         if not fn:
             return None
 
@@ -518,7 +547,6 @@ class ClientMiddleware:
         if message.startswith("client:"):
             _, cmd, d = message.split(":", 2)
             view = connection.view
-            #print(cmd, d)
             if cmd == "get-songlist":
                 js = JSONEncoder().encode({x:y for x,y in db.songs.items()})
                 connection.send_str("client:songlist:" + js)

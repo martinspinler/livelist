@@ -30,7 +30,8 @@ from lona.static_files import StyleSheet, Script, SORT_ORDER
 from lona import Route
 
 from database import PlaylistItem
-from views import ClientMiddleware, proxy_path
+from views import ClientMiddleware, Client, proxy_path
+import views
 
 host, port = ('0.0.0.0', 8012)
 
@@ -51,14 +52,18 @@ app.add_template('lona/frontend.js', """
 
 #db = Database()
 app.routes = [
-    Route(proxy_path + '/', 'views.py::PlaylistView'),
-    Route(proxy_path + '/play/<playlistId:.*>', 'views.py::PlayView'),
-    Route(proxy_path + '/sheets/<song>', 'views.py::SheetView', interactive=False),
-    Route(proxy_path + '/client/', 'views.py::Client'),
+    Route(proxy_path + '/', views.PlaylistView),
+    Route(proxy_path + '/play/<playlistId:.*>', views.PlayView),
+    Route(proxy_path + '/sheets/<song>', views.SheetView, interactive=False),
+    Route(proxy_path + '/client/', views.Client),
 ]
 # INFO: Doesn't work
 #app.settings.INITITAL_SERVER_STATE = {"proxy_path": proxy_path}
 app.settings.STATIC_URL_PREFIX = proxy_path + '/static/'
-app.settings.MIDDLEWARES = [ClientMiddleware]
-app.add_static_file('lona/style.css', """ """)
+app.settings.MIDDLEWARES = [
+        ClientMiddleware,
+]
+app.add_static_file('lona/style.css', """
+.playlistitemnr {pointer-events: none; width:3rem;}
+""")
 app.run(host=host, port=port, log_level='warn')

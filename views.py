@@ -27,6 +27,7 @@ from lona_bootstrap_5 import (
 from offcanvas import Offcanvas
 
 from database import *
+from widgets import *
 
 proxy_path = '/playlist'
 
@@ -44,19 +45,6 @@ class MyLonaView(LonaView):
                 self.server.fire_view_event(name, data, view_classes=vc)
 
 
-from lona.static_files import StyleSheet, Script, SORT_ORDER
-class Keypad(Widget):
-    nummap = {'1': "^\n", '2': "2aábcč", '3': "3dďeéf", '4': "4ghií", '5': "5jkl", '6': "6mnňoó", '7': "7pqrřsš", '8': "8tťuúův", '9': "9wxyýzž", '0': "0 "}
-    keypad_btns = ['1', '2 ABC', '3 DEF', '4 GHI ', '5 JKL', '6 MNO', '7 PQRS', '8 TUV', '9 WXYZ', 'BS', '0', 'Clr']
-    def __init__(self):
-        btns = [PrimaryButton(t, handle_click=self.on_keypad, _class="btn-lg") for i, t in enumerate(Keypad.keypad_btns)]
-        self.nodes = Div([Tr([Td(Div(btns[y*3+x], _class="d-grid p-1"), _class="gap-2") for x in range(3)], _class="gap-2") for y in range(4)])
-        self.listeners = []
-
-    def on_keypad(self, ev):
-        key = ev.node.get_text()[0]
-        [l(key) for l in self.listeners]
-
 class PlaylistPanel(Offcanvas):
     def __init__(self, on_song, _id):
         Offcanvas.__init__(self, _id)
@@ -72,27 +60,6 @@ class PlaylistPanel(Offcanvas):
         self.set_title("Playlists")
         self.set_body(self.div_play_list)
 
-
-class SonglistItem(Div):
-    def __init__(self, song, h):
-        Div.__init__(self)
-        #self.class_list.append("d-grid")
-        #self.class_list.append("d-md-block d-grid")
-        self.class_list.append("clearfix")
-        self.class_list.append("d-flexlock")
-        self.class_list.append("d-md-block")
-
-        name = song.name if len(song.name) <= 30 else song.name[:30] + "..."
-        self.btn = SecondaryButton(
-                Span(name, _class="d-grid flex-grow-1"),
-                handle_click=h,
-                _class="flex-grow-1",
-                )
-        self.song = self.btn.song = song
-        self.nodes = [
-                self.btn,
-                Span(str(song.played), _class="badge bg-primary rounded-pill float-end"),
-            ] + ([Span(f"{song.bpm}", _class="bi bi-music-note float-end")] if song.bpm else [])
 
 class SonglistPanel(Offcanvas):
     def __init__(self, on_song, _id):
@@ -163,15 +130,6 @@ class SonglistPanel(Offcanvas):
                 #n.class_list.remove("d-grid")
                 n.class_list.remove("d-md-block")
 
-class InstrumentSelector(Div):
-    def __init__(self):
-        Div.__init__(self, _class="dropdown")
-        self.nodes = HTML("""<button class="btn btn-secondary dropdown-toggle" type="button" id="dropdownMenu2" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">Instrument</button>
-  <div class="dropdown-menu" aria-labelledby="dropdownMenu2">
-  </div>""")
-        self.menu = self.query_selector('div.dropdown-menu')
-        #print(dd.get_text())
-
 
 class PlaylistView(MyLonaView):
     def on_play(self, ev):
@@ -183,24 +141,12 @@ class PlaylistView(MyLonaView):
         sort = ev.node
         item = ev.node.parent #.playlistItem
         if item not in self.sort_items:
+            item.sort_set(True, len(self.sort_items))
             self.sort_items.append(item)
-
-            sort.set_text(len(self.sort_items))
-            sort.class_list.remove("bi-sort-numeric-down")
-            sort.class_list.remove("btn-success")
-            sort.class_list.append("btn-primary" if len(self.sort_items) > 1 else "btn-warning" )
-            # + "bi-arrow-bar-down"
         else:
             # Update state: remove moving flags
             for ind, i in enumerate(self.sort_items):
-                #s = i.nodes[1]
-                s = i.sort_btn
-                s.class_list.append("bi-sort-numeric-down")
-                s.class_list.append("btn-success")
-                s.class_list.remove("btn-primary")
-                #s.class_list.remove("bi-arrow-bar-down")
-                s.class_list.remove("btn-warning")
-                s.set_text("")
+                i.sort_set(False)
 
             # TODO: Move handling to Database
             playlist = db.playlist[item.playlistItem.playlistId]['items']
@@ -282,25 +228,11 @@ class PlaylistView(MyLonaView):
         if songNode:
             songNode[0].btn.class_list.append("btn-dark")
 
-        li = Li(
-            Div(_class="btn rounded-pill bg-primary playlistitemnr"),
-            SuccessButton(_class="bi bi-play-fill", handle_click=self.on_play),
-            SuccessButton(_class="bi bi-sort-numeric-down sort_number", handle_click=self.on_sort),
-            Div(song.name, _class="flex-grow-1"),
-            #PrimaryButton(_class="bi bi-arrow-up btn-edit d-xxl-block", handle_click=self.on_up),
-            #PrimaryButton(_class="bi bi-arrow-down btn-edit d-xxl-block", handle_click=self.on_down),
-            #SuccessButton(_class="bi bi-recycle btn-edit d-xxl-block", handle_click=self.on_recycle),
-
-            # Info: sort
-            DangerButton (_class="bi bi-trash btn-edit d-xxl-block", handle_click=self.on_delete),
-            _class="list-group-item gap-3 d-flex")
-
-        li.playlistItem = pli
+        li = PlaylistItemWidget(self, song, pli)
         #self.playlist.nodes.insert(pli.pos, li) # CHECK
         self.playlist.nodes.append(li)
 
         li.nodes[0].set_text(str(self.playlist.nodes.index(li) + 1))
-        li.sort_btn = li.nodes[2]
 
     def populate_playlist(self):
         self.playlist.nodes.clear()
@@ -390,21 +322,7 @@ class PlayView(MyLonaView):
 
         self.forward = SuccessButton(_class="bi bi-skip-forward-fill push-right", handle_click=self.on_forward)
         self.backward = SuccessButton(_class="bi bi-skip-backward-fill", handle_click=self.on_backward)
-        self.pagination = HTML("""<ul class="pagination">
-    <li class="page-item">
-      <a class="page-link disabled" href="#" aria-label="Previous">
-        <span aria-hidden="true">&laquo;</span>
-      </a>
-    </li>
-    <li class="page-item"><a class="page-link disabled" href="#">1</a></li>
-    <li class="page-item"><a class="page-link disabled" href="#">2</a></li>
-    <li class="page-item"><a class="page-link disabled" href="#">3</a></li>
-    <li class="page-item">
-      <a class="page-link disabled" href="#" aria-label="Next">
-        <span aria-hidden="true">&raquo;</span>
-      </a>
-    </li>
-  </ul>""")
+        self.pagination = PaginationWidget() 
         nav = Nav(
             self.backward,
             A("Playlist", _class="btn btn-primary bi bi-list-ul", attributes={'href': f'{proxy_path}/', 'target': "_blank"}),

@@ -32,16 +32,15 @@ class PlaylistItemWidget(Li):
         SuccessButton(_class="bi bi-play-fill", handle_click=handler.on_play),
         SuccessButton(_class="bi bi-sort-numeric-down sort_number", handle_click=handler.on_sort),
         Div(song.name, _class="flex-grow-1"),
-        #PrimaryButton(_class="bi bi-arrow-up btn-edit d-xxl-block", handle_click=handler.on_up),
-        #PrimaryButton(_class="bi bi-arrow-down btn-edit d-xxl-block", handle_click=handler.on_down),
-        #SuccessButton(_class="bi bi-recycle btn-edit d-xxl-block", handle_click=handler.on_recycle),
-
-        # Info: sort
         DangerButton (_class="bi bi-trash btn-edit d-xxl-block", handle_click=handler.on_delete),
         _class="list-group-item gap-3 d-flex")
 
         self.playlistItem = pli
         self.sort_btn = self.nodes[2]
+
+        if hasattr(song, 'visual'):
+            if song.visual == 'yellow':
+                self.class_list.append('list-group-item-danger')
 
     def sort_set(self, active, index = 0):
         s = self.sort_btn

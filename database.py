@@ -9,6 +9,8 @@ import contextlib
 import random
 import sqlite3
 import subprocess
+from datetime import date
+
 from pathlib import Path
 
 import lona
@@ -35,7 +37,7 @@ class Song():
     @classmethod
     def from_yaml(cls, loader, node):
         s = cls()
-        attrs = ['id', 'name', 'file', 'store', 'notes', 'bpm', 'instruments']
+        attrs = ['id', 'name', 'file', 'store', 'notes', 'bpm', 'instruments', 'visual']
         [setattr(s, x, node[x]) for x in attrs if x in node]
         [setattr(s, x, None) for x in attrs if x not in node]
 
@@ -81,7 +83,6 @@ class Database():
                 #song._format = song.format + store['path'] + song.file + store['suffix'] if song.file != None else None
 
         self.playlist = yaml.load(open('playlist.yaml', 'r').read(), yaml.Loader)
-        #print(self.playlist)
 
         for p in self.playlist.values():
             if not hasattr(p, 'currentItemId'):
@@ -101,9 +102,20 @@ class Database():
         with open('playlist.yaml', 'w') as yaml_file:
             yaml.dump(self.playlist, yaml_file, default_flow_style=False)
 
-        # Temporary conversion
-        #with open('songs.yaml', 'w') as yaml_file:
-        #    yaml.dump([Song.to_yaml(None, s) for s in self.songs.values()], yaml_file, default_flow_style=False, allow_unicode=True)
+    def newPlaylist(self, band, name):
+        index = len(self.playlist) + 1
+        assert index not in self.playlist
+        p = self.playlist[index] = {}
+
+        p['id'] = index
+        p['band'] = band
+        p['currentItemId'] = None
+        p['date'] = str(date.today().strftime("%Y-%m-%d"))
+        p['items'] = []
+        p['note'] = name
+
+        self.save()
+        return index
 
     def newPlaylistItem(self, pl, song):
         item = PlaylistItem()
@@ -172,10 +184,6 @@ class Database():
         else:
             return playlist['items'][i + offset]
 
-
     #def get_currentPlaylistItem(self, playlistId):
     #    playlist  = db.playlist[playlistId]
     #    ci = pli['currentItemId']
-
-
-

@@ -47,18 +47,52 @@ class MyLonaView(LonaView):
 
 class PlaylistPanel(Offcanvas):
     def __init__(self, on_song, _id):
+        self._on_song = on_song
         Offcanvas.__init__(self, _id)
-        btns = []
-        for i, p in db.playlist.items():
-            bt = PrimaryButton(p['date'] + " " + p['note'], handle_click=on_song)
-            bt.playlistId = i
-            btns.append(bt)
 
-        items = [Div(b, _class="list-group-item") for b in btns]
-        self.div_play_list = Div(*items, _class="list-group gap-1")
+        self.div_play_list = Div(_class="list-group gap-1")
+        for i, p in db.playlist.items():
+            if 'deleted' in p: continue
+            bt = self._add(i, p)
+
+        self.name_edit = TextInput(placeholder='Name')
+        self.hdr = Div(
+                self.name_edit,
+                PrimaryButton(_class="bi bi-pencil", handle_click=self.on_rename),
+                PrimaryButton(_class="bi bi-plus", handle_click=self.on_add),
+                PrimaryButton(_class="bi bi-trash", handle_click=self.on_delete),
+        )
 
         self.set_title("Playlists")
-        self.set_body(self.div_play_list)
+        self.set_body(Div(self.hdr, self.div_play_list))
+
+    def _add(self, i, p):
+        bt = PrimaryButton(p['date'] + " " + p['note'], handle_click=self.on_item)
+        bt.playlistId = i
+        self.div_play_list.nodes.append(Div(bt, _class="list-group-item"))
+        return bt
+
+    def on_item(self, ev):
+        self.currentItem = ev.node
+        self.name_edit.value = ev.node.get_text()
+        self._on_song(ev)
+
+    def on_rename(self, ev):
+        self.currentItem.nodes[0].set_text(self.name_edit.value)
+        db.playlist[self.currentItem.playlistId].note = self.name_edit.value
+
+    def on_add(self, ev):
+        index = db.newPlaylist(1, self.name_edit.value)
+        self._add(index, db.playlist[index])
+
+    def on_copy(self, ev):
+        index = db.newPlaylist(1, self.name_edit.value)
+        self._add(index, db.playlist[index])
+
+    def on_delete(self, ev):
+        db.playlist[self.currentItem.playlistId]['deleted'] = True
+        self.div_play_list.nodes.remove(self.currentItem.parent)
+        db.save()
 
 
 class SonglistPanel(Offcanvas):
@@ -165,20 +199,6 @@ class PlaylistView(MyLonaView):
                 self.trigger_view_event('update', {'playlistId': item.playlistItem.playlistId})
             self.sort_items.clear()
 
-    def on_recycle(self, ev):
-        return
-        ev.node.parent.class_list.remove("list-group-item-secondary")
-
-    def on_up(self, ev):
-        item = ev.node.parent.playlistItem
-        if db.playlistItemMove(item, -1, True):
-            self.trigger_view_event('update', {'playlistId': item.playlistId})
-
-    def on_down(self, ev):
-        item = ev.node.parent.playlistItem
-        if db.playlistItemMove(item, 1, True):
-            self.trigger_view_event('update', {'playlistId': item.playlistId})
-
     def on_delete(self, ev):
         item = ev.node.parent.playlistItem
         db.deletePlaylistItem(item)
@@ -190,9 +210,6 @@ class PlaylistView(MyLonaView):
         if node: self.playlist.nodes.remove(node[0])
         songNode = [s for s in self.songlist.div_song_list.nodes if s.song.id == pli.songId]
         if songNode and len(same) == 1: songNode[0].btn.class_list.remove("btn-dark")
-
-    def on_playlist(self, ev):
-        self.setCurrentPlaylist(ev.node.playlistId)
 
     def setCurrentPlaylist(self, pid):
         pl = [x for x in self.playlistPanel.div_play_list if x.nodes[0].playlistId == self.currentPlaylist]
@@ -258,9 +275,9 @@ class PlaylistView(MyLonaView):
 
         self.playlist = Ul(_class="list-group gap-2", _id="playlist")
         self.songlist = sl = SonglistPanel(self.on_songlist, "songlistpanel")
-        self.playlistPanel = pp = PlaylistPanel(self.on_playlist, "playlistpanel")
+        self.playlistPanel = pp = PlaylistPanel(lambda ev: self.setCurrentPlaylist(ev.node.playlistId), "playlistpanel")
+
         self.btn_play = A("Live", _class="btn btn-primary bi bi-file-play", attributes={'href': f'{proxy_path}/play/{self.currentPlaylist}', 'target': "_blank"})
-        #print(type(self.btn_play), self.btn_play)
 
         self.setCurrentPlaylist(3)
         self.populate_playlist()
@@ -400,13 +417,11 @@ class PlayView(MyLonaView):
         pages = int(pages.split(":")[1].strip())
         self.img.nodes = [Img(attributes={'src': proxy_path + "/sheets/" + str(song.id) + f"-{instrument}--{i+1}.jpg"}) for i in range(pages)]
 
-
     def on_changeInstrument(self, ev):
         self.currentInstrument = ev.node.get_text()
         self.loadSongInstrument(self.currentPlaylistItem)
 
 
-#@app.route(proxy_path + '/sheets/<song>', interactive=False)
 class SheetView(MyLonaView):
     def handle_request(self, request):
         p = re.compile(r'(\w+)-(\w*)-(\w*)-(\w*).(\w+)')
@@ -430,7 +445,6 @@ class SheetView(MyLonaView):
             'body': open(f'{ofn}.jpg', 'rb').read(),
         }
 
-#@app.route(proxy_path + '/client/')
 class Client(MyLonaView):
     def on_view_event(self, e):
         if e.name == 'add' and e.data['playlistItem'].playlistId == self.activePlaylist:
@@ -449,7 +463,6 @@ class Client(MyLonaView):
 
     def handle_request(self, request):
         self.activePlaylist = None
-        #print(self.connection)
 
 class ClientMiddleware:
     def handle_request(self, data):

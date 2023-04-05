@@ -10,22 +10,6 @@ from lona_bootstrap_5 import (
 
 from offcanvas import Offcanvas
 
-class PlaylistPanel(Offcanvas):
-    def __init__(self, on_song, _id):
-        Offcanvas.__init__(self, _id)
-        btns = []
-        for i, p in db.playlist.items():
-            bt = PrimaryButton(p['date'] + " " + p['note'], handle_click=on_song)
-            bt.playlistId = i
-            btns.append(bt)
-
-        items = [Div(b, _class="list-group-item") for b in btns]
-        self.div_play_list = Div(*items, _class="list-group gap-1")
-
-        self.set_title("Playlists")
-        self.set_body(self.div_play_list)
-
-
 class PlaylistItemWidget(Li):
     def __init__(self, handler, song, pli):
         super().__init__(Div(_class="btn rounded-pill bg-primary playlistitemnr"),

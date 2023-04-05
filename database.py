@@ -1,33 +1,8 @@
 #!/usr/bin/python3
-import argparse
-import os
-import sys
 import json
 import yaml
-import re
-import contextlib
-import random
 import sqlite3
-import subprocess
 from datetime import date
-
-from pathlib import Path
-
-import lona
-import lona_bootstrap_5
-from lona import LonaView, LonaApp
-from lona.html import NumberInput, TextInput, A, Span, HTML, H1, Div, Node, Widget, Tr, Td, Ul, Li, Hr, Ol, Nav, Img, Small
-from lona_bootstrap_5 import (
-    BootstrapDiv,
-    SecondaryButton,
-    SuccessButton,
-    PrimaryButton,
-    DangerButton,
-    Button,
-)
-from offcanvas import Offcanvas
-
-from lona.static_files import StyleSheet, Script, SORT_ORDER
 
 class PlaylistItem():
     def __repr__(self):
@@ -37,7 +12,7 @@ class Song():
     @classmethod
     def from_yaml(cls, loader, node):
         s = cls()
-        attrs = ['id', 'name', 'file', 'store', 'notes', 'bpm', 'instruments', 'visual']
+        attrs = ['id', 'name', 'file', 'store', 'notes', 'bpm', 'instruments', 'visual', 'band']
         [setattr(s, x, node[x]) for x in attrs if x in node]
         [setattr(s, x, None) for x in attrs if x not in node]
 
@@ -72,6 +47,10 @@ class Database():
 
         songs = yaml.load(open('songs.yaml', 'r').read(), yaml.Loader)
         self.songs = {int(s['id']):Song.from_yaml(None, s) for s in songs}
+        for s in self.songs:
+            # FIXME: HOTFIX
+            if self.songs[s].band == None:
+                self.songs[s].band = 1
 
         for song in self.songs.values():
             store = (self.config['stores'][song.store]) if song.store != None else (self.config['stores'][self.config['defaultStore']])
@@ -136,7 +115,6 @@ class Database():
     def deletePlaylistItem(self, pli):
         i = self.playlist[pli.playlistId]['items'].index(pli)
         del self.playlist[pli.playlistId]['items'][i]
-        #del self.playlist[pli.playlistId]['items'][pli.id]
 
         self.save()
 
@@ -184,6 +162,8 @@ class Database():
         else:
             return playlist['items'][i + offset]
 
+    def setActivePlaylist(self, band, playlistId):
+        pass
     #def get_currentPlaylistItem(self, playlistId):
     #    playlist  = db.playlist[playlistId]
     #    ci = pli['currentItemId']

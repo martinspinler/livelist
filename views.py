@@ -13,6 +13,7 @@ from pathlib import Path
 
 import lona
 import lona.html
+import lona.middlewares.sessions
 import lona_bootstrap_5
 from lona import LonaView, LonaApp
 from lona.html import NumberInput, TextInput, A, Span, HTML, H1, Div, Node, Widget, Tr, Td, Ul, Li, Hr, Ol, Nav, Img, Small
@@ -33,34 +34,41 @@ proxy_path = '/playlist'
 
 img_cache_path = 'cache/'
 
-#from database import PlaylistItem
 db = Database()
 
+class CommonUser():
+    pass
+
+class User():
+    pass
+
 class MyLonaView(LonaView):
-    def trigger_view_event(self, name, data, urls=['/', '/client/', '/play/']):
+    def trigger_view_event(self, name, data, urls=['/band/', '/client/', '/play/']):
         for url in urls:
             vc = self.server.get_view_class(url=proxy_path + url)
             if vc:
-                #print(self, name, data, url)
                 self.server.fire_view_event(name, data, view_classes=vc)
 
 
 class PlaylistPanel(Offcanvas):
-    def __init__(self, on_song, _id):
+    def __init__(self, band, on_song, _id):
+        self.band = band
         self._on_song = on_song
         Offcanvas.__init__(self, _id)
 
         self.div_play_list = Div(_class="list-group gap-1")
         for i, p in db.playlist.items():
             if 'deleted' in p: continue
+            if p['band'] != self.band: continue
             bt = self._add(i, p)
 
         self.name_edit = TextInput(placeholder='Name')
         self.hdr = Div(
-                self.name_edit,
-                PrimaryButton(_class="bi bi-pencil", handle_click=self.on_rename),
-                PrimaryButton(_class="bi bi-plus", handle_click=self.on_add),
-                PrimaryButton(_class="bi bi-trash", handle_click=self.on_delete),
+            self.name_edit,
+            PrimaryButton(_class="bi bi-pencil", handle_click=self.on_rename),
+            PrimaryButton(_class="bi bi-plus", handle_click=self.on_add),
+            PrimaryButton(_class="bi bi-trash", handle_click=self.on_delete),
+            PrimaryButton(_class="bi bi-broadcast", handle_click=self.on_broadcast),
         )
 
         self.set_title("Playlists")
@@ -82,11 +90,11 @@ class PlaylistPanel(Offcanvas):
         db.playlist[self.currentItem.playlistId].note = self.name_edit.value
 
     def on_add(self, ev):
-        index = db.newPlaylist(1, self.name_edit.value)
+        index = db.newPlaylist(self.band, self.name_edit.value)
         self._add(index, db.playlist[index])
 
     def on_copy(self, ev):
-        index = db.newPlaylist(1, self.name_edit.value)
+        index = db.newPlaylist(self.band, self.name_edit.value)
         self._add(index, db.playlist[index])
 
     def on_delete(self, ev):
@@ -94,10 +102,14 @@ class PlaylistPanel(Offcanvas):
         self.div_play_list.nodes.remove(self.currentItem.parent)
         db.save()
 
+    def on_broadcast(self, ev):
+        db.setActivePlaylist(self.currentBand, self.currentItem.playlistId)
+
 
 class SonglistPanel(Offcanvas):
-    def __init__(self, on_song, _id):
+    def __init__(self, band, on_song, _id):
         Offcanvas.__init__(self, _id)
+        self.currentBand = band
         self.on_song_cb = on_song
         self.use_keypad_filter = True
         self.kp = Keypad()
@@ -131,7 +143,7 @@ class SonglistPanel(Offcanvas):
             self._update_filter(self.kpf)
 
     def on_sort(self, ev):
-        n = [SonglistItem(db.songs[s], self.on_song_cb) for s in db.songs]
+        n = [SonglistItem(db.songs[s], self.on_song_cb) for s in db.songs if db.songs[s].band == self.currentBand]
         if ev and ev.node == self.sort_bpm:
             n = sorted(n, key=lambda x: x.song.bpm if type(x.song.bpm) == int else 1000)
         self.div_song_list.nodes = n
@@ -172,8 +184,7 @@ class PlaylistView(MyLonaView):
         self.trigger_view_event('play', {'playlistItem': item})
 
     def on_sort(self, ev):
-        sort = ev.node
-        item = ev.node.parent #.playlistItem
+        item = ev.node.parent
         if item not in self.sort_items:
             item.sort_set(True, len(self.sort_items))
             self.sort_items.append(item)
@@ -182,12 +193,11 @@ class PlaylistView(MyLonaView):
             for ind, i in enumerate(self.sort_items):
                 i.sort_set(False)
 
-            # TODO: Move handling to Database
-            playlist = db.playlist[item.playlistItem.playlistId]['items']
-            firstItem = self.sort_items.pop(0).playlistItem
             # First item is anchor -> cancel action, don't move in this case
+            firstItem = self.sort_items.pop(0).playlistItem
             if item.playlistItem != firstItem:
-                #print(playlist, self.sort_items)
+                # TODO: Move handling to Database
+                playlist = db.playlist[item.playlistItem.playlistId]['items']
                 for i in self.sort_items:
                     playlist.remove(i.playlistItem)
 
@@ -196,6 +206,7 @@ class PlaylistView(MyLonaView):
                     playlist.insert(base_index + 1, i.playlistItem)
 
                 db.save()
+
                 self.trigger_view_event('update', {'playlistId': item.playlistItem.playlistId})
             self.sort_items.clear()
 
@@ -213,16 +224,14 @@ class PlaylistView(MyLonaView):
 
     def setCurrentPlaylist(self, pid):
         pl = [x for x in self.playlistPanel.div_play_list if x.nodes[0].playlistId == self.currentPlaylist]
-        for p in pl:
-            p.class_list.remove("active")
+        for p in pl: p.class_list.remove("active")
 
         self.currentPlaylist = pid
 
         self.btn_play.set_href(f'{proxy_path}/play/{self.currentPlaylist}')
 
         pl = [x for x in self.playlistPanel.div_play_list if x.nodes[0].playlistId == self.currentPlaylist]
-        pl[0].class_list.append("active")
-
+        for item in pl: item.class_list.append("active")
         self.populate_playlist()
 
     def on_songlist(self, ev):
@@ -267,19 +276,50 @@ class PlaylistView(MyLonaView):
         self._e_hidden = not self._e_hidden
 
     def handle_request(self, request):
+        self.currentBand = None
+        if 'bandName' in request.match_info:# and request.match_info['playlistId']:
+            currentBand = request.match_info['bandName']
+            cb = [i for i in db.config['bands'] if db.config['bands'][i]['addr'] == currentBand]
+            if cb:
+                self.currentBand = int(cb[0]);
+
+        if not self.currentBand:
+            self.show("Kapela nebyla nalezena")
+            return
+
         self.set_title("Playlist")
+
+        # Login
+        access = db.config['bands'][self.currentBand]['access']
+        if isinstance(request.user, lona.middlewares.sessions.AnonymousUser):
+            self.set_title("Anonymous Playlist")
+            request.user.can_edit = False
+            request.user.can_show = False
+            #print(request.cookies)
+        elif isinstance(request.user, CommonUser):
+            #request.user.can_edit = False
+            #request.user.can_show = False
+            pass
+        elif isinstance(request.user, User):
+            pass
+        
+
+
+
+        #if access['edit']
+
         self._e_hidden = False
         self.playing = None
         self.currentPlaylist = None
         self.sort_items = []
 
         self.playlist = Ul(_class="list-group gap-2", _id="playlist")
-        self.songlist = sl = SonglistPanel(self.on_songlist, "songlistpanel")
-        self.playlistPanel = pp = PlaylistPanel(lambda ev: self.setCurrentPlaylist(ev.node.playlistId), "playlistpanel")
+        self.songlist = sl = SonglistPanel(self.currentBand, self.on_songlist, "songlistpanel")
+        self.playlistPanel = pp = PlaylistPanel(self.currentBand, lambda ev: self.setCurrentPlaylist(ev.node.playlistId), "playlistpanel")
 
         self.btn_play = A("Live", _class="btn btn-primary bi bi-file-play", attributes={'href': f'{proxy_path}/play/{self.currentPlaylist}', 'target': "_blank"})
 
-        self.setCurrentPlaylist(3)
+        self.setCurrentPlaylist(int(db.config['bands'][self.currentBand]['lastPlaylist']))# = int(cb[0]);
         self.populate_playlist()
         self.hide_edit(None)
 
@@ -299,12 +339,10 @@ class PlaylistView(MyLonaView):
             self.playlist,
         )
 
-        #self.songlist.show()
         self.show(html)
 
     def on_view_event(self, e):
         if e.name == 'add' and e.data['playlistItem'].playlistId == self.currentPlaylist:
-            #print(e)
             self.add_playlist_item(e.data['playlistItem'])
         if e.name == 'delete' and e.data['playlistItem'].playlistId == self.currentPlaylist:
             self.song_delete(e.data['playlistItem'])
@@ -330,10 +368,15 @@ class PlayView(MyLonaView):
             self.trigger_view_event('play', {'playlistItem': item})
 
     def handle_request(self, request):
-        self.currentSong = Div()
         self.activePlaylist = None
         if 'playlistId' in request.match_info and request.match_info['playlistId']:
             self.activePlaylist = int(request.match_info['playlistId'])
+
+        if self.activePlaylist == None:
+            return HTML("No current playlist")
+
+        self.currentSong = Div()
+
         self.img = Div()
         self.instr_select = InstrumentSelector()
 
@@ -386,7 +429,6 @@ class PlayView(MyLonaView):
         if e.name == 'update' and e.data['playlistId'] == self.activePlaylist:
             self.update_btns()
 
-
     def loadSong(self, playlistItem):
         if not hasattr(self, 'currentInstrument'):
             self.currentInstrument = 'Piano'
@@ -421,7 +463,12 @@ class PlayView(MyLonaView):
         self.currentInstrument = ev.node.get_text()
         self.loadSongInstrument(self.currentPlaylistItem)
 
+class MainView(MyLonaView):
+    def handle_request(self, request):
+        html = HTML(f"Patrne jsi chtel navstivit <a href='{proxy_path}/band/perfecttime'>Perfect Time</a>")
+        self.show(html)
 
+ 
 class SheetView(MyLonaView):
     def handle_request(self, request):
         p = re.compile(r'(\w+)-(\w*)-(\w*)-(\w*).(\w+)')
@@ -510,7 +557,7 @@ class ClientMiddleware:
                     trigger_view_event(server, 'play', {'playlistItem': pli})
         return data
 
-def trigger_view_event(server, name, data, urls= ['/', '/client/', '/play/']):
+def trigger_view_event(server, name, data, urls= ['/band/', '/client/', '/play/']):
     for url in urls:
         vc = server.get_view_class(url=proxy_path + url)
         if vc:

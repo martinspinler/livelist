@@ -16,14 +16,15 @@ import views
 from views import proxy_path
 
 host, port = ('0.0.0.0', 8012)
+#host, port = ('0.0.0.0', 80)
 
 app = LonaApp(__file__)
 
-class BootstrapThemeHTML(HTML):
-    STATIC_FILES = [StyleSheet(
-        name='bootstrap-darkly',
-        path='static/bootstrap-darkly.min.css',
-    )]
+#class BootstrapThemeHTML(HTML):
+#    STATIC_FILES = [StyleSheet(
+#        name='bootstrap-darkly',
+#        path='static/bootstrap-darkly.min.css',
+#    )]
 
 app.add_template('lona/frontend.js', """
     lona_context.add_disconnect_hook(function(lona_context, event) {
@@ -35,17 +36,25 @@ app.add_template('lona/frontend.js', """
 #db = Database()
 app.routes = [
     Route(proxy_path + '/band/<bandName:.*>', views.PlaylistView),
+    Route(proxy_path + '/', views.PlaylistView),
     Route(proxy_path + '/play/<playlistId:.*>', views.PlayView),
     Route(proxy_path + '/sheets/<song>', views.SheetView, interactive=False),
     Route(proxy_path + '/client/', views.Client),
-    Route(proxy_path + '/', views.MainView),
+    Route(proxy_path + '/home/', views.MainView),
 ]
 # INFO: Doesn't work
 #app.settings.INITITAL_SERVER_STATE = {"proxy_path": proxy_path}
+app.settings.CLIENT_PING_INTERVAL = 600
+app.settings.CLIENT_VIEW_START_TIMEOUT = 1
 app.settings.STATIC_URL_PREFIX = proxy_path + '/static/'
 app.settings.MIDDLEWARES = [
         views.ClientMiddleware,
 ]
+app.STATIC_FILES = [StyleSheet(
+        name='bootstrap-darkly',
+        path='static/bootstrap-darkly.min.css',
+    )]
+
 app.add_static_file('lona/style.css', """
 .playlistitemnr {pointer-events: none; width:3rem;}
 """)

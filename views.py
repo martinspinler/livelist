@@ -16,7 +16,11 @@ import lona.html
 import lona.middlewares.sessions
 import lona_bootstrap_5
 from lona import LonaView, LonaApp
-from lona.html import NumberInput, TextInput, A, Span, HTML, H1, Div, Node, Widget, Tr, Td, Ul, Li, Hr, Ol, Nav, Img, Small
+from lona.html import NumberInput, TextInput, A, Span, H1, Div, Hr, Br, Node, Widget, Tr, Td, Ul, Li, Hr, Ol, Nav, Img, Small
+#from lona.html import HTML as HTML_lona
+from lona.html.widgets import HTML as HTML1
+from lona.static_files import StyleSheet, Script, SORT_ORDER
+
 from lona_bootstrap_5 import (
     BootstrapDiv,
     SecondaryButton,
@@ -24,17 +28,25 @@ from lona_bootstrap_5 import (
     PrimaryButton,
     DangerButton,
     Button,
+    Modal,
 )
 from offcanvas import Offcanvas
 
 from database import *
 from widgets import *
 
-proxy_path = '/playlist'
+proxy_path = ''
 
 img_cache_path = 'cache/'
 
 db = Database()
+
+class BootstrapThemeHTML(HTML1):
+    STATIC_FILES = [StyleSheet(
+        name='bootstrap-darkly',
+        path='static/bootstrap-darkly.min.css',
+    )]
+
 
 class CommonUser():
     pass
@@ -56,38 +68,39 @@ class PlaylistPanel(Offcanvas):
         self._on_song = on_song
         Offcanvas.__init__(self, _id)
 
+        self.name_edit = TextInput(placeholder='Name', _style={'width':'100%'})
+        self.hdr = Div(
+            Div(self.name_edit),
+            PrimaryButton(_class="bi bi-pencil", handle_click=self.on_rename),
+            PrimaryButton(_class="bi bi-plus", handle_click=self.on_add),
+            PrimaryButton(_class="bi bi-trash", handle_click=self.on_delete),
+            PrimaryButton(_class="bi bi-broadcast", handle_click=lambda ev: self.on_broadcast(ev.node)),
+        )
+
         self.div_play_list = Div(_class="list-group gap-1")
         for i, p in db.playlist.items():
             if 'deleted' in p: continue
             if p['band'] != self.band: continue
             bt = self._add(i, p)
 
-        self.name_edit = TextInput(placeholder='Name')
-        self.hdr = Div(
-            self.name_edit,
-            PrimaryButton(_class="bi bi-pencil", handle_click=self.on_rename),
-            PrimaryButton(_class="bi bi-plus", handle_click=self.on_add),
-            PrimaryButton(_class="bi bi-trash", handle_click=self.on_delete),
-            PrimaryButton(_class="bi bi-broadcast", handle_click=self.on_broadcast),
-        )
-
         self.set_title("Playlists")
-        self.set_body(Div(self.hdr, self.div_play_list))
+        self.set_body(Div(self.hdr, Hr(), self.div_play_list))
 
     def _add(self, i, p):
-        bt = PrimaryButton(p['date'] + " " + p['note'], handle_click=self.on_item)
+        bt = PrimaryButton(p['date'] + " " + p['note'], handle_click=lambda ev: self.on_item(ev.node))
         bt.playlistId = i
         self.div_play_list.nodes.append(Div(bt, _class="list-group-item"))
         return bt
 
-    def on_item(self, ev):
-        self.currentItem = ev.node
-        self.name_edit.value = ev.node.get_text()
-        self._on_song(ev)
+    def on_item(self, node):
+        self.currentItem = node
+        self.name_edit.value = node.get_text()
+        self._on_song(node)
 
     def on_rename(self, ev):
-        self.currentItem.nodes[0].set_text(self.name_edit.value)
-        db.playlist[self.currentItem.playlistId].note = self.name_edit.value
+        self.currentItem.set_text(self.name_edit.value)
+        p = db.playlist[self.currentItem.playlistId]
+        p['note'] = self.name_edit.value.replace(p['date'] +" ", "")
 
     def on_add(self, ev):
         index = db.newPlaylist(self.band, self.name_edit.value)
@@ -103,31 +116,39 @@ class PlaylistPanel(Offcanvas):
         db.save()
 
     def on_broadcast(self, ev):
-        db.setActivePlaylist(self.currentBand, self.currentItem.playlistId)
+        db.setActivePlaylist(self.band, self.currentItem.playlistId)
 
 
 class SonglistPanel(Offcanvas):
-    def __init__(self, band, on_song, _id):
+    def __init__(self, band, _id, on_song, on_edit_song):
         Offcanvas.__init__(self, _id)
         self.currentBand = band
         self.on_song_cb = on_song
+        self.on_edit_song_cb = on_edit_song
         self.use_keypad_filter = True
         self.kp = Keypad()
         self.kp.listeners.append(self.keypad_btns)
 
         self.div_song_list = Div(_class="list-group gap-1")
-        #n = [SonglistItem(db.songs[s], on_song) for s in db.songs]
-        #self.div_song_list.nodes = n
         self.on_sort(None)
 
         self.sort_alp = PrimaryButton(_class="bi bi-sort-alpha-down", handle_click=self.on_sort)
         self.sort_bpm = PrimaryButton(_class="bi bi-sort-numeric-down", handle_click=self.on_sort)
 
         self.input_filter = TextInput(placeholder='Name', handle_change=self.on_kbf)
+        self.add_new_song = PrimaryButton(_class="bi bi-plus")
 
         self.kpfs = Small()
         self.set_title("Song list")
-        self.set_body(self.kp, self.input_filter, Hr(), Div(self.sort_alp, self.sort_bpm, self.kpfs, _class="d-flex gap-2"), Hr(), self.div_song_list)
+        self.set_body(
+            self.kp,
+            self.input_filter,
+            self.add_new_song,
+            Hr(),
+            Div(self.sort_alp, self.sort_bpm, self.kpfs, _class="d-flex gap-2"),
+            Hr(),
+            self.div_song_list,
+        )
 
         self.kpf = ""
         self.keypad_btns("C")
@@ -143,7 +164,7 @@ class SonglistPanel(Offcanvas):
             self._update_filter(self.kpf)
 
     def on_sort(self, ev):
-        n = [SonglistItem(db.songs[s], self.on_song_cb) for s in db.songs if db.songs[s].band == self.currentBand]
+        n = [SonglistItem(self, db.songs[s], self.on_song_cb, self.on_edit_song_cb) for s in db.songs if db.songs[s].band == self.currentBand]
         if ev and ev.node == self.sort_bpm:
             n = sorted(n, key=lambda x: x.song.bpm if type(x.song.bpm) == int else 1000)
         self.div_song_list.nodes = n
@@ -157,6 +178,7 @@ class SonglistPanel(Offcanvas):
             self.kpf = self.kpf[:-1]
         elif key == 'C':
             self.kpf = ""
+            self.input_filter.value = ""
         else:
             self.kpf += key
         kf = "".join(["[" + Keypad.nummap[num] + "]" for num in self.kpf])
@@ -234,11 +256,17 @@ class PlaylistView(MyLonaView):
         for item in pl: item.class_list.append("active")
         self.populate_playlist()
 
+        self.set_title(f"Playlist: {pl[0].nodes[0].nodes[0]}")
+
     def on_songlist(self, ev):
         song = ev.node.song
         pli = db.newPlaylistItem(self.currentPlaylist, song)
         self.songlist.keypad_btns('C')
         self.trigger_view_event('add', {'playlistItem': pli})
+
+    def on_edit_song(self, ev):
+        self.editSongDialog.loadSong(ev.node.song)
+        pass
 
     def play_item(self, item):
         if self.playing:
@@ -277,22 +305,34 @@ class PlaylistView(MyLonaView):
 
     def handle_request(self, request):
         self.currentBand = None
-        if 'bandName' in request.match_info:# and request.match_info['playlistId']:
+
+        currentBand = None
+        if 'bandName' in request.match_info:# and request.match_info['playliistId']:
             currentBand = request.match_info['bandName']
+
+        subdomains = ['pekac', 'perfecttime']
+        sd = request.connection.http_request.host.replace('.livelist.cz', '') 
+        if sd in subdomains:
+            currentBand = sd
+
+        if currentBand:
             cb = [i for i in db.config['bands'] if db.config['bands'][i]['addr'] == currentBand]
             if cb:
                 self.currentBand = int(cb[0]);
 
         if not self.currentBand:
-            self.show("Kapela nebyla nalezena")
+            #self.show("Kapela nebyla nalezena")
+            return {
+                'http_redirect': '/home/',
+            }
             return
 
-        self.set_title("Playlist")
+        self.set_title(f"Playlist: ")
 
         # Login
         access = db.config['bands'][self.currentBand]['access']
         if isinstance(request.user, lona.middlewares.sessions.AnonymousUser):
-            self.set_title("Anonymous Playlist")
+            #self.set_title("Anonymous Playlist")
             request.user.can_edit = False
             request.user.can_show = False
             #print(request.cookies)
@@ -303,9 +343,6 @@ class PlaylistView(MyLonaView):
         elif isinstance(request.user, User):
             pass
         
-
-
-
         #if access['edit']
 
         self._e_hidden = False
@@ -314,14 +351,24 @@ class PlaylistView(MyLonaView):
         self.sort_items = []
 
         self.playlist = Ul(_class="list-group gap-2", _id="playlist")
-        self.songlist = sl = SonglistPanel(self.currentBand, self.on_songlist, "songlistpanel")
-        self.playlistPanel = pp = PlaylistPanel(self.currentBand, lambda ev: self.setCurrentPlaylist(ev.node.playlistId), "playlistpanel")
+        self.songlist = sl = SonglistPanel(self.currentBand, "songlistpanel", self.on_songlist, self.on_edit_song)
+        self.playlistPanel = pp = PlaylistPanel(self.currentBand, lambda node: self.setCurrentPlaylist(node.playlistId), "playlistpanel")
+        
+        self.songlist.add_new_song.handle_click = self.on_new_song
 
         self.btn_play = A("Live", _class="btn btn-primary bi bi-file-play", attributes={'href': f'{proxy_path}/play/{self.currentPlaylist}', 'target': "_blank"})
 
-        self.setCurrentPlaylist(int(db.config['bands'][self.currentBand]['lastPlaylist']))# = int(cb[0]);
+        #self.setCurrentPlaylist(int(db.config['bands'][self.currentBand]['lastPlaylist']))# = int(cb[0]);
+
+        for n in pp.div_play_list.nodes:
+            if db.config['bands'][self.currentBand]['activePlaylist'] == n.nodes[0].playlistId:
+                pp.on_item(n.nodes[0])
+
         self.populate_playlist()
         self.hide_edit(None)
+
+        self.editSongDialog = EditSongDialog(db)
+        self.editPlaylistDialog = EditPlaylistDialog(db)
 
         nav = Nav(
             Button("Add song", _class="btn btn-primary bi bi-plus", attributes={'data-bs-toggle': "offcanvas", 'data-bs-target': "#songlistpanel"}),
@@ -337,9 +384,24 @@ class PlaylistView(MyLonaView):
             self.songlist,
             self.playlistPanel,
             self.playlist,
+            self.editSongDialog,
+            self.editPlaylistDialog,
         )
 
+        #self.editSongDialog.loadSong(db, -1)
+
+        #self.editPlaylistDialog.show()
+
         self.show(html)
+
+    def on_new_song(self, e):
+        new_name = self.songlist.input_filter.value
+        print(new_name)
+        #self.playlistPanel.editPlaylistDialog.show(
+
+        db.newSong(self.currentBand, new_name)
+        self.songlist.on_sort(None)
+
 
     def on_view_event(self, e):
         if e.name == 'add' and e.data['playlistItem'].playlistId == self.currentPlaylist:
@@ -465,7 +527,7 @@ class PlayView(MyLonaView):
 
 class MainView(MyLonaView):
     def handle_request(self, request):
-        html = HTML(f"Patrne jsi chtel navstivit <a href='{proxy_path}/band/perfecttime'>Perfect Time</a>")
+        html = HTML(f"Comming soon ;)")
         self.show(html)
 
  

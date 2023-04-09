@@ -25,7 +25,7 @@ class Song():
     @classmethod
     def to_yaml(cls, dumper, data):
         node = data.__dict__.copy()
-        exclude = ['played', 'filename']
+        exclude = ['played', 'filename', '_format']
         for i in data.__dict__:
             if node[i] == None or i in exclude:
                 del node[i]
@@ -45,7 +45,8 @@ class Database():
 
         self.config = yaml.load(open('config.yaml', 'r').read(), yaml.Loader)
 
-        songs = yaml.load(open('songs.yaml', 'r').read(), yaml.Loader)
+        songs = yaml.load(open('songlist_new.yaml', 'r').read(), yaml.Loader)
+        #songs = yaml.load(open('songs.yaml', 'r').read(), yaml.Loader)
         self.songs = {int(s['id']):Song.from_yaml(None, s) for s in songs}
         for s in self.songs:
             # FIXME: HOTFIX
@@ -81,6 +82,15 @@ class Database():
         with open('playlist.yaml', 'w') as yaml_file:
             yaml.dump(self.playlist, yaml_file, default_flow_style=False)
 
+    def saveConfig(self):
+        with open('config.yaml', 'w') as yaml_file:
+            yaml.dump(self.config, yaml_file, default_flow_style=False)
+
+    def saveSonglist(self):
+        with open('songlist_new.yaml', 'w') as yaml_file:
+            yaml.dump([Song.to_yaml(None, self.songs[s]) for s in self.songs], yaml_file, default_flow_style=False, allow_unicode=True)
+
+
     def newPlaylist(self, band, name):
         index = len(self.playlist) + 1
         assert index not in self.playlist
@@ -111,6 +121,10 @@ class Database():
         self.save()
 
         return item
+
+    def newSong(self, band, name):
+        pass
+
 
     def deletePlaylistItem(self, pli):
         i = self.playlist[pli.playlistId]['items'].index(pli)
@@ -163,6 +177,8 @@ class Database():
             return playlist['items'][i + offset]
 
     def setActivePlaylist(self, band, playlistId):
+        self.config['bands'][band]['activePlaylist'] = playlistId
+        self.saveConfig()
         pass
     #def get_currentPlaylistItem(self, playlistId):
     #    playlist  = db.playlist[playlistId]

@@ -6,6 +6,7 @@ from lona_bootstrap_5 import (
     PrimaryButton,
     DangerButton,
     Button,
+    Modal,
 )
 
 from offcanvas import Offcanvas
@@ -44,13 +45,14 @@ class PlaylistItemWidget(Li):
 
 
 class SonglistItem(Div):
-    def __init__(self, song, h):
+    def __init__(self, panel, song, h, h2):
         Div.__init__(self)
         #self.class_list.append("d-grid")
         #self.class_list.append("d-md-block d-grid")
         self.class_list.append("clearfix")
         self.class_list.append("d-flexlock")
         self.class_list.append("d-md-block")
+        self._panel = panel
 
         name = song.name if len(song.name) <= 30 else song.name[:30] + "..."
         self.btn = SecondaryButton(
@@ -58,11 +60,30 @@ class SonglistItem(Div):
                 handle_click=h,
                 _class="flex-grow-1",
                 )
+
         self.song = self.btn.song = song
+
+        self.btn_edit = SecondaryButton(
+                #Span(name, _class="d-grid flex-grow-1"),
+                handle_click=h2,
+                _class="bi bi-pencil float-end",
+                )
+        self.btn_edit.song = song
+        self.bpm = Span(f"{song.bpm}", _class="bi bi-music-note float-end")
+
         self.nodes = [
                 self.btn,
                 Span(str(song.played), _class="badge bg-primary rounded-pill float-end"),
-            ] + ([Span(f"{song.bpm}", _class="bi bi-music-note float-end")] if song.bpm else [])
+                #*[Span(f"{song.bpm}", _class="bi bi-music-note float-end")]*(song.bpm!=None),
+                self.btn_edit,
+                self.bpm,
+            ]
+        if not song.bpm:
+            self.bpm.hide()
+
+    #def edit(self, e):
+    #    self._panel.hide()
+    #    self._panel.editSongDialog
 
 
 class InstrumentSelector(Div):
@@ -102,3 +123,90 @@ class Keypad(Widget):
         key = ev.node.get_text()[0]
         [l(key) for l in self.listeners]
 
+class EditSongDialog(Modal):
+    def __init__(self, db):
+        super().__init__()
+
+        d = Div(_id="editSongDialog")
+        d.modal = self
+        #self.attributes['id'] = "editSongDialog"
+        #self.attributes['id'] = "editSongDialog"
+
+        self._db = db
+
+        self.name = TextInput(placeholder='Name')
+        self.tempo = NumberInput(placeholder='Tempo')
+
+        self.set_title("Song edit")
+        self.set_body(
+            d,
+            self.name,
+            self.tempo,
+        )
+        self.set_buttons(
+                PrimaryButton("OK", handle_click=lambda x: self.save()),
+                SecondaryButton("Cancel", handle_click=lambda x: self.hide()),
+        )
+
+    def loadSong(self, song):
+        self._song = song
+
+        #s = self._db.songs[self._song]
+        s = self._song
+
+        self.name.value = s.name
+        if s.bpm: self.tempo.value = s.bpm
+
+        self.show()
+
+    def save(self):
+        s = self._song
+        s.name = self.name.value
+        s.bpm = int(self.tempo.value) if self.tempo.value else None 
+
+        self._db.saveSonglist()
+        self.hide()
+
+class EditPlaylistDialog(Modal):
+    def __init__(self, db):
+        super().__init__()
+
+        d = Div(_id="editPlaylistDialog")
+        d.modal = self
+
+        self._db = db
+
+        self.name = TextInput(placeholder='Name')
+        self.date = HTML("""<input
+            type="datetime-local"
+            name="partydate"
+            value="2017-06-01T08:30" />""")
+
+        self.set_title("Playlist edit")
+        self.set_body(
+            d,
+            self.name,
+            self.date,
+        )
+        self.set_buttons(
+                PrimaryButton("OK", handle_click=lambda x: self.save()),
+                SecondaryButton("Cancel", handle_click=lambda x: self.hide()),
+        )
+
+    def load(self, playlist):
+        self._playlist = playlist
+
+        #s = self._song
+
+        #self.name.value = s.name
+        #if s.bpm: self.tempo.value = s.bpm
+
+        self.show()
+
+    def save(self):
+        #s = self._song
+        #s.name = self.name.value
+        #s.bpm = int(self.tempo.value) if self.tempo.value else None 
+
+        #self._db.saveSonglist()
+        self.hide()

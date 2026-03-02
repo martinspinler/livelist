@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+
+{% block title %}{{ _('index_title') }} - {{ _('index_subtitle') }}{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <!-- Page header -->
+    <div class="text-center mb-4">
+        <h1 class="display-5 fw-bold">{{ _('index_title') }}</h1>
+        <p class="lead text-muted">{{ _('index_subtitle') }}</p>
+    </div>
+
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card">
+                {% if bad_access %}
+                <div class="alert alert-warning alert-dismissible fade show" role="alert">
+                    <strong>{{ _('index_bad_access') }}</strong>
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+                {% endif %}
+
+                <div class="card-header">
+                    <h4 class="mb-0">{{ _('index_select_band') }}</h4>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted mb-4">{{ _('index_choose_band') }}</p>
+
+                    {% if bands %}
+                    <div class="list-group">
+                        {% for band in bands %}
+                        <a href="{% if subdomain is not none and subdomain == band.addr %}/{% else %}{{ url_for('views.view_band', band=band.addr) }}{% endif %}"
+                            class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
+                            <div>
+                                <h5 class="mb-1">{{ band.name }}</h5>
+                                <small class="text-muted">{{ _('index_address') }}: {{ band.addr }}</small>
+                            </div>
+                            <span class="bi bi-chevron-right"></span>
+                        </a>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+
+                    <form action="/login" method="post">
+                        {% if subdomain is not none %}<input type="hidden" name="subdomain" value="{{ subdomain }}">{%
+                        endif %}
+                        <div class="mt-4">
+                            <p class="text-muted">{% if subdomain is not none %}{{ _('index_enter_key_for',
+                                addr=subdomain) }}{% else %}{{ _('index_or_access') }}{% endif %}</p>
+                            <div class="mb-3 xxinput-group">
+                                <div class="mb-2">
+                                    <input type="text" name="band_name" class="form-control" id="subdomain-input"
+                                        placeholder="name" aria-label="Subdomain" {% if subdomain is not none %}
+                                        value="{{ subdomain }}" readonly="readonly" {% endif %}>
+                                    <!--<label class="btn btn-sm btn-outline-primary bi bi-arrow-bar-up" for="subdomain-input">Before</label>-->
+                                </div>
+                                <div class="mb-2">
+                                    <input type="text" name="band_access_key" class="form-control" id="key-input"
+                                        placeholder="key" aria-label="Key">
+                                </div>
+                                <div class="mb-2">
+                                    <input type="submit" class="btn btn-primary" type="button" id="go-input"
+                                        value="{{ _('index_go') }}">
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+
+                    {% if subdomain is not none %}
+                    <div class="mt-3">
+                        <a href="/login" class="text-muted small">{{ _('index_log_out', addr=subdomain) }}</a>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Features section -->
+    <div class="row justify-content-center mt-5 mb-5">
+        <div class="col-md-8">
+            <p class="text-center text-muted mb-4">{{ _('index_features') }}</p>
+            <div class="row g-4">
+                <div class="col-md-4">
+                    <div class="text-center">
+                        <div class="mb-2"><i class="bi bi-broadcast fs-3 text-primary"></i></div>
+                        <h6>{{ _('feature_realtime_title') }}</h6>
+                        <small class="text-muted">{{ _('feature_realtime_desc') }}</small>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="text-center">
+                        <div class="mb-2"><i class="bi bi-play-btn fs-3 text-primary"></i></div>
+                        <h6>{{ _('feature_modes_title') }}</h6>
+                        <small class="text-muted">{{ _('feature_modes_desc') }}</small>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="text-center">
+                        <div class="mb-2"><i class="bi bi-bookmark fs-3 text-primary"></i></div>
+                        <h6>{{ _('feature_anchor_title') }}</h6>
+                        <small class="text-muted">{{ _('feature_anchor_desc') }}</small>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="text-center">
+                        <div class="mb-2"><i class="bi bi-music-note-list fs-3 text-primary"></i></div>
+                        <h6>{{ _('feature_library_title') }}</h6>
+                        <small class="text-muted">{{ _('feature_library_desc') }}</small>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="text-center">
+                        <div class="mb-2"><i class="bi bi-pause-btn fs-3 text-primary"></i></div>
+                        <h6>{{ _('feature_sets_title') }}</h6>
+                        <small class="text-muted">{{ _('feature_sets_desc') }}</small>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="text-center">
+                        <div class="mb-2"><i class="bi bi-file-earmark-music fs-3 text-primary"></i></div>
+                        <h6>{{ _('feature_live_title') }}</h6>
+                        <small class="text-muted">{{ _('feature_live_desc') }}</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

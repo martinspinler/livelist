@@ -1,0 +1,30 @@
+[project]
+name = "livelist"
+version = "1.1.0"
+description = "Collaborative playlist management — server and client"
+requires-python = ">=3.9"
+
+[project.optional-dependencies]
+server = [
+    "sqlalchemy",
+    "flask",
+    "flask_socketio",
+    "flask_sqlalchemy",
+    "pyyaml",
+    "python-dotenv",
+]
+client = [
+    "python-socketio[client]",
+    "python-socketio[asyncio_client]",
+]
+all = ["livelist[server,client]"]
+
+[tool.setuptools]
+packages = [
+    "livelist",
+    "livelist.client",
+    "livelist.config",
+    "livelist.models",
+    "livelist.routes",
+    "livelist.utils",
+]

@@ -1,0 +1,13 @@
+{
+  "patterns": {
+    "lyr_txt": {"render": "text", "pattern": "scores/{name}/{name}{instrument}.txt", "label": "Lyrics", "instr": ["voc"]},
+    "default": {"render": "pdf", "pattern": "scores/{name}/{name}{instrument}.pdf", "label": "Instrument"},
+    "lyr_pdf": {"render": "pdf", "pattern": "scores/lyrics/{name}.pdf", "label": "Lyrics-PDF", "instr": ["voc"]},
+    "sheets": {"render": "pdf", "pattern": "sheets/{name}.pdf", "label": "Sheets"}
+  },
+  "instruments": {
+    "sax": {"name": "Sax", "prio": ["default", "sheets"], "patterns": [" - Sax", "-Sax", ""]},
+    "pno": {"name": "Piano", "prio": ["default", "sheets"], "patterns": ["-Piano", " - Piano", ""]},
+    "voc": {"name": "Vocal", "prio": ["lyr_txt", "lyr_pdf", "default", "sheets"], "patterns": [" - Vocal", " - Lyrics", " - Voice", "-Voice", ""]}
+  }
+}

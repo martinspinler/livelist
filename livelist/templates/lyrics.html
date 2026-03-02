@@ -1,0 +1,6 @@
+{% for paragraph in paragraphs %}
+<p>
+    {% for line in paragraph %}{{ line }}{% if not loop.last %}<br>{% endif %}
+    {% endfor %}
+</p>
+{% endfor %}

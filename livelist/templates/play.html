@@ -1,0 +1,669 @@
+{% extends "base.html" %}
+
+{% block title %}Sheets - {{ playlist.name }} - {{ band.name }}{% endblock %}
+
+{% block extra_head %}
+<style>
+    /* --- Day mode (default) --- */
+    body {
+        background-color: #fff;
+        color: #222;
+        font-family: monospace;
+        overflow: hidden;
+        transition: background-color 0.2s, color 0.2s;
+    }
+    /* --- Night mode --- */
+    body.night {
+        background-color: #000;
+        color: #ddd;
+    }
+    body.night .content-area img {
+        filter: invert(1);
+    }
+    body.night .lyrics-container {
+        color: #eee;
+    }
+    body.night .no-content-msg,
+    body.night .ireal-stub {
+        color: #888;
+    }
+    :root { --play-nav-h: 92px; }
+    .play-nav {
+        position: fixed;
+        top: 0; left: 0; right: 0;
+        z-index: 1000;
+        transition: none;
+    }
+    .play-nav .btn { font-size: 0.85rem; }
+    /* Connection status indicator */
+    .conn-dot {
+        width: 0.6rem; height: 0.6rem; border-radius: 50%;
+        display: inline-block; flex: 0 0 auto; background: #6c757d;
+    }
+    .conn-dot.conn-on  { background: #198754; }
+    .conn-dot.conn-off { background: #dc3545; }
+    .content-area {
+        position: absolute;
+        top: var(--play-nav-h);
+        width: 100%;
+        height: calc(100vh - var(--play-nav-h));
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    /* --- PDF engine --- */
+    .content-area img {
+        display: block;
+        max-width: 100%;
+        max-height: calc(100vh - var(--play-nav-h));
+        object-fit: contain;
+        transition: filter 0.2s;
+    }
+    .page-tap {
+        position: absolute;
+        top: var(--play-nav-h);
+        width: 50vw;
+        height: calc(100vh - var(--play-nav-h));
+        opacity: 0;
+        cursor: pointer;
+        z-index: 500;
+    }
+    .page-tap-left  { left: 0; }
+    .page-tap-right { right: 0; }
+    /* --- Text (lyrics) engine --- */
+    .lyrics-container {
+        width: 100%;
+        height: calc(100vh - var(--play-nav-h));
+        overflow-y: auto;
+        padding: 2rem 3rem;
+        font-size: 1.5rem;
+        line-height: 1.8;
+        color: #222;
+        transition: color 0.2s;
+    }
+    .lyrics-container p { margin-bottom: 1.2em; }
+    /* --- iReal stub --- */
+    .ireal-stub {
+        text-align: center;
+        margin-top: 30vh;
+        color: #aaa;
+        font-size: 1.5rem;
+    }
+    .ireal-stub .bi { font-size: 3rem; display: block; margin-bottom: 1rem; }
+    /* --- Shared --- */
+    .no-content-msg {
+        font-size: 2rem;
+        text-align: center;
+        color: #999;
+        margin-top: 30vh;
+    }
+    .dropdown-menu { max-height: 40vh; overflow-y: auto; }
+</style>
+<script type="text/javascript" src="{{ url_for('static', filename='js/socket.io.min.js') }}"></script>
+<script type="text/javascript" src="{{ url_for('static', filename='js/fullscreen.js') }}"></script>
+{% endblock %}
+
+{% block content %}
+<!-- Navigation bar -->
+<nav class="play-nav navbar navbar-dark bg-dark px-2 py-1 flex-column align-items-stretch gap-1">
+    <!-- Row 1: transport controls + song title (lg+) -->
+    <div class="d-flex align-items-center gap-1 flex-nowrap">
+        <button id="btn-fullscreen" class="btn btn-outline-light bi bi-arrows-fullscreen"
+                title="Fullscreen"></button>
+        <button id="btn-night" class="btn btn-outline-light bi bi-moon-fill"
+                title="Night mode"></button>
+        <a class="btn btn-primary bi bi-list-ul text-truncate" href="/band/{{ band.addr }}"
+           title="Back to playlist">
+            <span class="d-none d-md-inline">Playlist</span>
+        </a>
+
+        <!-- Spacer: pins the right group to the right edge; shows the centered
+             song title on large screens (lg+). On narrow screens it is just a gap. -->
+        <span class="flex-grow-1 d-flex justify-content-center" style="min-width:0">
+            <span class="song-title navbar-text fw-bold text-truncate d-none d-lg-block"
+                  style="min-width:0; max-width:100%">
+                {% if active_song %}{{ active_song.name }}{% else %}No song playing{% endif %}
+            </span>
+        </span>
+
+        <span id="conn-status" class="conn-dot" title="Connecting…"></span>
+        <button id="btn-backward" class="btn btn-outline-success bi bi-skip-backward-fill text-truncate"
+                style="max-width:18vw" disabled title="Previous song (broadcasts)">
+            <span class="d-none d-md-inline" id="backward-label"></span>
+        </button>
+        <button id="btn-forward" class="btn btn-outline-success bi bi-skip-forward-fill text-truncate"
+                style="min-width:0; max-width:min(18rem, calc(100vw - 17rem))" disabled title="Next song (broadcasts)">
+            <span id="forward-label"></span>
+        </button>
+
+        <button class="btn btn-outline-light bi bi-three-dots-vertical" type="button"
+                data-bs-toggle="offcanvas" data-bs-target="#play-more-panel"
+                title="More"></button>
+    </div>
+
+    <!-- Row 2: centered song name (narrow screens only; hidden on lg+) -->
+    <div class="d-flex justify-content-center w-100 d-lg-none">
+        <span class="song-title navbar-text fw-bold text-truncate" id="current-song-name"
+              style="max-width:100%; min-width:0">
+            {% if active_song %}{{ active_song.name }}{% else %}No song playing{% endif %}
+        </span>
+    </div>
+</nav>
+
+<!-- More panel: instrument & document selectors (kept out of the cramped nav) -->
+<div class="offcanvas offcanvas-end bg-dark text-light" tabindex="-1" id="play-more-panel">
+    <div class="offcanvas-header">
+        <h5 class="offcanvas-title">More</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas"></button>
+    </div>
+    <div class="offcanvas-body d-flex flex-column gap-3">
+        <div>
+            <label class="form-label mb-1">Instrument</label>
+            <div class="dropdown w-100" id="instrument-selector" style="display:none">
+                <button class="btn btn-secondary dropdown-toggle w-100 text-start" type="button"
+                        id="instr-dropdown-btn" data-bs-toggle="dropdown" data-bs-display="static" aria-expanded="false">
+                    Piano
+                </button>
+                <ul class="dropdown-menu" id="instr-dropdown-menu"></ul>
+            </div>
+        </div>
+        <div>
+            <label class="form-label mb-1">Document</label>
+            <div class="dropdown w-100" id="document-selector" style="display:none">
+                <button class="btn btn-outline-light dropdown-toggle w-100 text-start" type="button"
+                        id="doc-dropdown-btn" data-bs-toggle="dropdown" data-bs-display="static" aria-expanded="false">
+                    Sheet
+                </button>
+                <ul class="dropdown-menu" id="doc-dropdown-menu"></ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Content area (populated by the active rendering engine) -->
+<div class="content-area" id="content-area">
+    <div id="content-inner"></div>
+</div>
+
+<!-- Invisible tap zones for page turning (PDF engine only) -->
+<div class="page-tap page-tap-left"  id="tap-prev" style="display:none"></div>
+<div class="page-tap page-tap-right" id="tap-next" style="display:none"></div>
+
+<!-- Jinja-injected state for JS -->
+<script>
+function jinja_update(state) {
+    state.currentBand = {{ band.id }};
+    state.currentPlaylist = {{ playlist.id }};
+    state.activePlaylist = {{ playlist.id }};
+    state.socket_auth = {auth: {band: "{{ band.addr }}", key: "{{ auth_key or '' }}"}};
+
+    // Playlist items (song-carrying only, skip breaks)
+    state.songItems = {{ song_items | tojson | safe }};
+
+    // Active item at page load
+    state.activeItemId = {{ active_item_id | tojson | safe }};
+
+    // Documents for the initially active song
+    state.activeDocuments = {{ active_documents | tojson | safe }};
+
+    // Instrument definitions from store config: {instr_id: display_name}
+    state.storeInstruments = {{ store_instruments | tojson | safe }};
+
+    // Rendering type labels
+    state.renderingLabels = {{ rendering_labels | tojson | safe }};
+
+    // Band addr for cookie-based preferences
+    state.bandAddr = "{{ band.addr }}";
+
+    // Preferred instrument from cookie
+    state.instrPref = "{{ instr_pref }}";
+}
+</script>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function() {
+    "use strict";
+
+    // ---- State ----
+    var state = { io: io };
+    jinja_update(state);
+
+    var currentPage = 0;
+    var totalPages = 0;
+    var currentInstrument = state.instrPref || Object.keys(state.storeInstruments)[0] || 'pno';
+    var currentDocIndex = -1;  // index into current documents list
+    var currentDocuments = state.activeDocuments || [];
+
+    var socket = state.io(window.location.host, state.socket_auth);
+
+    // ---- DOM refs ----
+    var contentArea     = document.getElementById('content-area');
+    var contentInner    = document.getElementById('content-inner');
+    var btnForward      = document.getElementById('btn-forward');
+    var btnBackward     = document.getElementById('btn-backward');
+    var forwardLabel    = document.getElementById('forward-label');
+    var backwardLabel   = document.getElementById('backward-label');
+    var instrSelector   = document.getElementById('instrument-selector');
+    var instrBtn        = document.getElementById('instr-dropdown-btn');
+    var instrMenu       = document.getElementById('instr-dropdown-menu');
+    var docSelector     = document.getElementById('document-selector');
+    var docBtn          = document.getElementById('doc-dropdown-btn');
+    var docMenu         = document.getElementById('doc-dropdown-menu');
+    var tapPrev         = document.getElementById('tap-prev');
+    var tapNext         = document.getElementById('tap-next');
+    var btnNight        = document.getElementById('btn-night');
+    var navEl           = document.querySelector('.play-nav');
+    var connStatus      = document.getElementById('conn-status');
+
+    // ---- Night mode ----
+
+    var nightMode = false;
+
+    function toggleNightMode() {
+        nightMode = !nightMode;
+        document.body.classList.toggle('night', nightMode);
+        btnNight.classList.toggle('bi-moon-fill', !nightMode);
+        btnNight.classList.toggle('bi-sun-fill', nightMode);
+        btnNight.title = nightMode ? 'Day mode' : 'Night mode';
+    }
+
+    btnNight.addEventListener('click', toggleNightMode);
+
+    // ---- Connection status + dynamic nav height ----
+    socket.on('connect', function() {
+        connStatus.className = 'conn-dot conn-on';
+        connStatus.title = 'Connected';
+    });
+    socket.on('disconnect', function() {
+        connStatus.className = 'conn-dot conn-off';
+        connStatus.title = 'Disconnected — not receiving song updates';
+    });
+
+    // Keep content area below the (two-row) nav regardless of wrapping.
+    function syncNavHeight() {
+        document.documentElement.style.setProperty(
+            '--play-nav-h', navEl.offsetHeight + 'px'
+        );
+    }
+    window.addEventListener('resize', syncNavHeight);
+    syncNavHeight();
+    requestAnimationFrame(syncNavHeight);
+
+    // ---- Helpers ----
+
+    /** Update every song-title element (Row 1 desktop + Row 2 mobile). */
+    function setSongName(text) {
+        document.querySelectorAll('.song-title').forEach(function(el) { el.textContent = text; });
+    }
+
+    function getActiveItem() {
+        return state.songItems.find(function(i) { return i.id === state.activeItemId; }) || null;
+    }
+
+    function getNeighbour(offset) {
+        var items = state.songItems;
+        var idx = items.findIndex(function(i) { return i.id === state.activeItemId; });
+        if (idx < 0) return null;
+        var nIdx = idx + offset;
+        return (nIdx >= 0 && nIdx < items.length) ? items[nIdx] : null;
+    }
+
+    function updateNavButtons() {
+        var bw = getNeighbour(-1);
+        var fw = getNeighbour(+1);
+        btnBackward.disabled = !bw;
+        btnForward.disabled  = !fw;
+        backwardLabel.textContent = bw ? bw.song_name : '';
+        forwardLabel.textContent  = fw ? fw.song_name : '';
+    }
+
+    // ---- Instrument / Document selectors ----
+
+    function buildInstrumentMenu() {
+        instrMenu.innerHTML = '';
+        var instruments = state.storeInstruments;
+        if (!instruments || Object.keys(instruments).length === 0) {
+            instrSelector.style.display = 'none';
+            return;
+        }
+        instrSelector.style.display = '';
+        Object.keys(instruments).forEach(function(id) {
+            var li = document.createElement('li');
+            var btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'dropdown-item' + (id === currentInstrument ? ' active' : '');
+            btn.textContent = instruments[id] || id;
+            btn.dataset.instrId = id;
+            btn.addEventListener('click', function() { selectInstrument(id); });
+            li.appendChild(btn);
+            instrMenu.appendChild(li);
+        });
+        instrBtn.textContent = instruments[currentInstrument] || currentInstrument;
+    }
+
+    function buildDocumentMenu(documents) {
+        docMenu.innerHTML = '';
+        if (!documents || documents.length === 0) {
+            docSelector.style.display = 'none';
+            return;
+        }
+        docSelector.style.display = '';
+        documents.forEach(function(doc, idx) {
+            var li = document.createElement('li');
+            var btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'dropdown-item' + (idx === currentDocIndex ? ' active' : '');
+
+            // Label: render type + pattern label + matched instruments
+            var renderLabel = state.renderingLabels[doc.render] || doc.render;
+            var instrIds = Object.keys(doc.instruments_matched);
+            var instrNames = instrIds.map(function(iid) {
+                return state.storeInstruments[iid] || iid;
+            });
+            btn.textContent = renderLabel + ' \u00B7 ' + doc.label;
+            if (instrNames.length > 0) {
+                btn.textContent += ' [' + instrNames.join(', ') + ']';
+            }
+            btn.title = doc.pattern_id + ' / ' + doc.path;
+            btn.dataset.docIndex = idx;
+            btn.addEventListener('click', function() { selectDocument(idx); });
+            li.appendChild(btn);
+            docMenu.appendChild(li);
+        });
+        // Update button text to show selected document
+        if (currentDocIndex >= 0 && currentDocIndex < documents.length) {
+            var sel = documents[currentDocIndex];
+            docBtn.textContent = (state.renderingLabels[sel.render] || sel.render) + ' \u00B7 ' + sel.label;
+        } else {
+            docBtn.textContent = '\u2014';
+        }
+    }
+
+    function selectInstrument(instrId) {
+        currentInstrument = instrId;
+        buildInstrumentMenu();
+        // Auto-select first document matching this instrument
+        autoSelectDocument();
+        loadCurrentDocument();
+        // Persist to cookie
+        fetch('/api/instr-pref/' + encodeURIComponent(state.bandAddr), {
+            method: 'POST',
+            headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+            body: 'instr_id=' + encodeURIComponent(instrId),
+        });
+    }
+
+    function selectDocument(docIndex) {
+        if (docIndex < 0 || docIndex >= currentDocuments.length) return;
+        currentDocIndex = docIndex;
+        buildDocumentMenu(currentDocuments);
+        loadCurrentDocument();
+    }
+
+    /** Auto-select the best document for currentInstrument.
+
+        Each document's instruments_matched is {instr_id: suffix_index}.
+        The suffix_index is the position in that instrument's suffix list
+        (lower = higher priority). We pick the document with the lowest
+        suffix_index for the selected instrument. Among equal suffix_index,
+        pattern order (list position) breaks ties.
+    */
+    function autoSelectDocument() {
+        var docs = currentDocuments;
+        if (!docs || docs.length === 0) {
+            currentDocIndex = -1;
+            return;
+        }
+        var bestIdx = -1;
+        var bestSuffixIdx = Infinity;
+        for (var i = 0; i < docs.length; i++) {
+            var matched = docs[i].instruments_matched;
+            if (matched && matched[currentInstrument] !== undefined) {
+                var sIdx = matched[currentInstrument];
+                if (sIdx < bestSuffixIdx) {
+                    bestSuffixIdx = sIdx;
+                    bestIdx = i;
+                }
+            }
+        }
+        if (bestIdx >= 0) {
+            currentDocIndex = bestIdx;
+            return;
+        }
+        // Fallback: first document
+        currentDocIndex = 0;
+    }
+
+    // ---- Rendering engines ----
+
+    function clearContent() {
+        contentInner.innerHTML = '';
+        tapPrev.style.display = 'none';
+        tapNext.style.display = 'none';
+        currentPage = 0;
+        totalPages = 0;
+    }
+
+    function showNoContent(msg) {
+        contentInner.innerHTML = '<div class="no-content-msg">' + msg + '</div>';
+    }
+
+    // -- PDF engine --
+
+    function renderPdf(songId, patternId, instrId) {
+        clearContent();
+        tapPrev.style.display = '';
+        tapNext.style.display = '';
+
+        var page = 1;
+        function loadPage() {
+            var img = new Image();
+            img.src = '/sheets/' + songId + '/' + patternId + '/' + instrId + '/' + page + '.jpg';
+            img.style.display = page === 1 ? 'block' : 'none';
+            img.dataset.page = page;
+
+            img.onload = function() {
+                contentInner.appendChild(img);
+                totalPages = page;
+                page++;
+                loadPage();
+            };
+            img.onerror = function() {
+                totalPages = page - 1;
+                if (totalPages === 0) {
+                    showNoContent('No sheet');
+                }
+                showPage(1);
+            };
+        }
+        loadPage();
+    }
+
+    function showPage(n) {
+        var imgs = contentInner.querySelectorAll('img');
+        if (imgs.length === 0) return;
+        currentPage = Math.max(1, Math.min(n, imgs.length));
+        imgs.forEach(function(img, i) {
+            img.style.display = (i + 1 === currentPage) ? 'block' : 'none';
+        });
+    }
+
+    // -- Text (lyrics) engine --
+
+    function renderText(songId, patternId, instrId) {
+        clearContent();
+
+        fetch('/lyrics/' + songId + '/' + patternId + '/' + instrId)
+            .then(function(resp) {
+                if (resp.ok) return resp.text();
+                return null;
+            })
+            .then(function(html) {
+                if (html) {
+                    contentInner.innerHTML = '<div class="lyrics-container">' + html + '</div>';
+                } else {
+                    showNoContent('No lyrics');
+                }
+            })
+            .catch(function(err) {
+                showNoContent('No lyrics');
+            });
+    }
+
+    // -- iReal engine (stub) --
+
+    function renderIreal() {
+        clearContent();
+        contentInner.innerHTML =
+            '<div class="ireal-stub">' +
+            '<i class="bi bi-music-note-beamed"></i>' +
+            'iReal rendering not yet implemented' +
+            '</div>';
+    }
+
+    // -- Dispatch ----
+
+    function loadCurrentDocument() {
+        var item = getActiveItem();
+        if (!item || currentDocIndex < 0 || currentDocIndex >= currentDocuments.length) {
+            showNoContent(item ? 'No document available' : 'No song playing');
+            return;
+        }
+
+        var doc = currentDocuments[currentDocIndex];
+        var songId = item.song_id;
+        // Use the first instrument in instruments_matched as the resolving instrument for the URL
+        var resolveInstr = Object.keys(doc.instruments_matched)[0] || currentInstrument;
+
+        switch (doc.render) {
+            case 'pdf':   renderPdf(songId, doc.pattern_id, resolveInstr);   break;
+            case 'text':  renderText(songId, doc.pattern_id, resolveInstr);  break;
+            case 'ireal': renderIreal();                                       break;
+            default:      renderPdf(songId, doc.pattern_id, resolveInstr);
+        }
+    }
+
+    // ---- Load initial song ----
+
+    function applyDocuments(documents) {
+        currentDocuments = documents || [];
+        autoSelectDocument();
+        buildInstrumentMenu();
+        buildDocumentMenu(currentDocuments);
+    }
+
+    function loadActiveItem() {
+        var item = getActiveItem();
+        var documents = item ? item.documents : state.activeDocuments;
+
+        applyDocuments(documents);
+
+        if (!item) {
+            setSongName('No song playing');
+            showNoContent('No song playing');
+            updateNavButtons();
+            return;
+        }
+
+        setSongName(item.song_name);
+        loadCurrentDocument();
+        updateNavButtons();
+    }
+
+    // ---- Socket.IO events ----
+
+    socket.on("item_played", function(msg) {
+        if (msg.playlist_id !== state.currentPlaylist) return;
+
+        state.activeItemId = msg.item_id;
+
+        // Use server-provided documents when available
+        var documents = msg.documents || null;
+        if (!documents) {
+            var item = getActiveItem();
+            if (!item) return;
+            documents = item.documents || [];
+        }
+
+        // Update local songItems entry so future lookups stay consistent
+        var localItem = getActiveItem();
+        if (localItem && msg.documents) {
+            localItem.documents = msg.documents;
+        }
+        if (localItem && msg.song_name) {
+            localItem.song_name = msg.song_name;
+        }
+
+        applyDocuments(documents);
+        setSongName(msg.song_name || (localItem ? localItem.song_name : ''));
+        loadCurrentDocument();
+        updateNavButtons();
+    });
+
+    socket.on("playlist_updated", function(msg) {
+        if (msg.playlist_id !== state.currentPlaylist) return;
+        state.songItems = msg.items
+            .filter(function(i) { return i.song_id != null; })
+            .map(function(i) {
+                var existing = state.songItems.find(function(s) { return s.id === i.id; });
+                return {
+                    id: i.id,
+                    song_id: i.song_id,
+                    song_name: existing ? existing.song_name : ('Song #' + i.song_id),
+                    position: i.position,
+                    documents: existing ? existing.documents : [],
+                };
+            });
+        updateNavButtons();
+    });
+
+    // ---- Event listeners ----
+
+    btnForward.addEventListener('click', function() {
+        socket.emit("play_item", { item_id: null, off: 1, playlist_id: state.currentPlaylist });
+    });
+
+    btnBackward.addEventListener('click', function() {
+        socket.emit("play_item", { item_id: null, off: -1, playlist_id: state.currentPlaylist });
+    });
+
+    tapNext.addEventListener('click', function() {
+        if (currentPage < totalPages) showPage(currentPage + 1);
+    });
+
+    tapPrev.addEventListener('click', function() {
+        if (currentPage > 1) showPage(currentPage - 1);
+    });
+
+    // Keyboard shortcuts
+    document.addEventListener('keydown', function(e) {
+        var tag = (e.target || {}).tagName;
+        if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+
+        if (currentDocuments.length > 0 && currentDocIndex >= 0 && currentDocuments[currentDocIndex].render === 'pdf') {
+            if (e.key === 'ArrowRight' || e.key === ' ') {
+                e.preventDefault();
+                if (currentPage < totalPages) showPage(currentPage + 1);
+            } else if (e.key === 'ArrowLeft') {
+                e.preventDefault();
+                if (currentPage > 1) showPage(currentPage - 1);
+            }
+        }
+        // Song navigation (all modes)
+        if (e.key === 'PageDown' || (currentDocuments.length > 0 && currentDocIndex >= 0 && currentDocuments[currentDocIndex].render !== 'pdf' && e.key === 'n')) {
+            e.preventDefault();
+            socket.emit("play_item", { item_id: null, off: 1, playlist_id: state.currentPlaylist });
+        } else if (e.key === 'PageUp' || (currentDocuments.length > 0 && currentDocIndex >= 0 && currentDocuments[currentDocIndex].render !== 'pdf' && e.key === 'p')) {
+            e.preventDefault();
+            socket.emit("play_item", { item_id: null, off: -1, playlist_id: state.currentPlaylist });
+        }
+    });
+
+    // ---- Init ----
+    loadActiveItem();
+    initFullscreenToggle('btn-fullscreen');
+})();
+</script>
+{% endblock %}

@@ -1,0 +1,7 @@
+.env
+**/__pycache__
+livelist/static/js/ehtml/
+livelist/static/js/*bootstrap*
+livelist/static/js/*socket*
+livelist/static/css/*bootstrap*
+livelist/static/css/fonts/*

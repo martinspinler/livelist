@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en" data-bs-theme="dark">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>{% block title %}Livelist{% endblock %}</title>
+
+    <!-- Bootstrap CSS -->
+    <link href="{{ url_for('static', filename='css/bootstrap.min.css') }}" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/bootstrap-icons.min.css') }}" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/custom.css') }}" rel="stylesheet">
+    <link rel="shortcut icon" href="{{ url_for('static', filename='favicon.ico') }}">
+
+    <!-- e-html Framework -->
+    <script type="importmap">
+    {
+        "imports": {
+            "#ehtml/": "{{ url_for('static', filename='js/ehtml/') }}",
+            "#ehtml/main": "{{ url_for('static', filename='js/ehtml/main.js') }}"
+        }
+    }
+    </script>
+    <script type="module">import "#ehtml/main";</script>
+
+    {% block extra_head %}{% endblock %}
+</head>
+<body>
+    {% block body %}
+    <div id="app">
+        {% block content %}{% endblock %}
+    </div>
+    {% endblock %}
+
+    <!-- Bootstrap JS -->
+    <script src="{{ url_for('static', filename='js/bootstrap.bundle.min.js') }}"></script>
+
+    {% block scripts %}{% endblock %}
+</body>
+</html>

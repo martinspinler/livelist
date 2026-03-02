@@ -1,0 +1,112 @@
+{% extends "base.html" %} {% block title %}Live - {{ playlist.name }} -
+{{band.name }}{% endblock %} {% block extra_head %}
+<style>
+    body {
+        background-color: #000;
+        color: #fff;
+        font-family: monospace;
+    }
+    .current-song {
+        font-size: 3rem;
+        font-weight: bold;
+        text-align: center;
+        margin-top: 20vh;
+    }
+    .song-info {
+        font-size: 1.5rem;
+        text-align: center;
+        margin-top: 2rem;
+        color: #ccc;
+    }
+    .playlist-progress {
+        margin-top: 3rem;
+        text-align: center;
+    }
+    .next-song {
+        margin-top: 3rem;
+        text-align: center;
+        color: #666;
+    }
+</style>
+<script
+    type="module"
+    src="{{ url_for('static', filename='js/auth.js') }}"
+></script>
+{% endblock %} {% block content %}
+<div class="container">
+    <div class="row">
+        <div class="col-12">
+            <h1 class="text-center mb-4">
+                {{ band.name }} - {{ playlist.name }}
+            </h1>
+
+            <!-- Current Song Display -->
+            <e-html
+                data-src="{{ url_for('api.get_playlist', playlist_id=playlist.id) }}"
+            >
+                <template>
+                    <div class="current-song" id="current-song">
+                        {% raw %}{% endraw %}${active_item_id ? items.find(i =>
+                        i.id === active_item_id)?.song?.name || 'No song
+                        playing' : 'No song playing'}
+                    </div>
+                    <div class="song-info">
+                        <!-- --
+                        ${active_item_id ? (() => { const item = items.find(i => i.id === active_item_id); return item?.song?.user_id ? 'Arranged by: ' + item.song.user_id : ''; })() : ''}-->
+                    </div>
+                </template>
+            </e-html>
+
+            <!-- Playlist Progress -->
+            <div class="playlist-progress">
+                <e-html
+                    data-src="{{ url_for('api.get_playlist_items', playlist_id=playlist.id) }}"
+                >
+                    <template>
+                        <div class="progress" style="height: 30px">
+                            ${(items.findIndex(i => i.id === {{
+                            playlist.active_item_id if playlist.active_item_id
+                            else 0 }}) + 1) || 0}/${items.length}
+                        </div>
+                    </template>
+                </e-html>
+            </div>
+
+            <!-- Next Song -->
+            <div class="next-song">
+                <h3>Next:</h3>
+                <e-html
+                    data-src="{{ url_for('api.get_playlist_items', playlist_id=playlist.id) }}"
+                >
+                    <template>
+                        <div id="next-song">
+                            ${(() => { const currentIndex = items.findIndex(i =>
+                            i.id === {{ playlist.active_item_id if
+                            playlist.active_item_id else 0 }}); if (currentIndex
+                            >= 0 && currentIndex + 1 < items.length) { return
+                            items[currentIndex + 1].song.name; } else { return
+                            'End of playlist'; } })()}
+                        </div>
+                    </template>
+                </e-html>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} {% block scripts %}
+<script>
+    // Set band and token for JavaScript
+    const currentBand = {{ band.id }};
+    const authToken = "{{ band.view_token }}";
+
+    // Initialize authentication
+    if (typeof initAuth === 'function') {
+        initAuth(currentBand, authToken);
+    }
+
+    // Auto-refresh every 10 seconds
+    setInterval(() => {
+        // The e-html components will refresh automatically due to their data-src
+    }, 10000);
+</script>
+{% endblock %}

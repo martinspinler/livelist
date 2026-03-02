@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+
+{% block title %}{{ song_name }} - Sheets - {{ band.name }}{% endblock %}
+
+{% block extra_head %}
+<style>
+    .sheet-container {
+        width: 100%;
+        height: 90vh;
+    }
+    .sheet-iframe {
+        width: 100%;
+        height: 100%;
+        border: none;
+    }
+    .sheet-actions {
+        margin-top: 1rem;
+        text-align: center;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <nav aria-label="breadcrumb" class="mb-3">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{{ url_for('views.index') }}">{{ band.name }}</a></li>
+            <li class="breadcrumb-item active" aria-current="page">{{ song_name }}</li>
+        </ol>
+    </nav>
+
+    <div class="sheet-container">
+        <!-- The sheet will be loaded by JavaScript based on the song configuration -->
+        <iframe class="sheet-iframe" id="sheet-iframe" title="Sheet Music"></iframe>
+    </div>
+
+    <div class="sheet-actions">
+        <button class="btn btn-primary" id="prev-sheet">Previous</button>
+        <button class="btn btn-primary" id="next-sheet">Next</button>
+        <button class="btn btn-secondary" id="zoom-in">Zoom In</button>
+        <button class="btn btn-secondary" id="zoom-out">Zoom Out</button>
+        <button class="btn btn-secondary" id="fit-width">Fit Width</button>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // This is a simplified version. In the original Lona project, the sheet URL is constructed from the config.
+    // We assume the song_name is the file name without extension.
+    const songName = "{{ song_name }}";
+    const bandId = {{ band.id }};
+
+    // Function to load the sheet. In a real implementation, we would fetch the song details and construct the URL.
+    function loadSheet() {
+        // Example: /static/sheets/{{ song_name }}.pdf
+        const sheetUrl = `/static/sheets/${songName}.pdf`;
+        document.getElementById('sheet-iframe').src = sheetUrl;
+    }
+
+    document.addEventListener('DOMContentLoaded', loadSheet);
+</script>
+{% endblock %}

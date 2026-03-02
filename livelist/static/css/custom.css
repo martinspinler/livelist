@@ -1,0 +1,259 @@
+.btn:hover {
+    background-color: rgb(from var(--bs-btn-hover-bg) r g b / 60%);
+}
+
+.dragging {
+    opacity: 0.5;
+}
+
+.drag-handle {
+    touch-action: none;
+}
+
+.mode-move .drag-handle {
+    cursor: grab;
+}
+
+.drag-handle:hover {
+    opacity: 1;
+}
+
+.mode-move .drag-handle:active {
+    cursor: grabbing;
+}
+
+/* Grip icon in right button group */
+.livelist-item-grip {
+    color: var(--bs-secondary-color);
+}
+
+/* Position number and selectbox sizing */
+.livelist-item-position,
+.livelist-item-selectbox {
+    min-width: 3.0em;
+    text-align: center;
+}
+
+/* Break selectbox (left side) sizing — align with item position */
+.livelist-break-selectbox,
+.clipboard-copy-break-set-left {
+    min-width: 3.0em;
+    text-align: center;
+}
+
+/* Anchor direction indicators */
+.anchor-dir-down,
+.anchor-dir-up {
+    font-size: 0.65em;
+    vertical-align: middle;
+}
+
+/* Move-to-anchor button */
+.livelist-item-move-to-anchor {
+    color: var(--bs-primary);
+}
+
+/* Navbar anchor info */
+#anchor-info-dir {
+    font-size: 0.8em;
+}
+
+.anchor-info-symbol {
+    font-size: 0.9em;
+}
+
+#anchor-info-pos {
+    min-width: 2.5em;
+    text-align: center;
+    vertical-align: middle;
+    line-height: 1.4;
+}
+
+#anchor-info-name {
+    display: inline-block;
+    max-width: 8em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    vertical-align: middle;
+}
+
+@media (min-width: 768px) {
+    #anchor-info-name {
+        max-width: 18em;
+    }
+}
+
+.container-fluid {
+    --bs-gutter-x: 1.0em;
+}
+
+/* Livelist item styling */
+
+.livelist-item.list-group-item-action {
+    color: var(--bs-list-group-color);
+}
+
+.songlist-item.list-group-item.active {
+    background-color: rgb(from var(--bs-list-group-active-bg) r g b / 50%)
+}
+
+.playlist-item.list-group-item.active {
+    background-color: rgb(from var(--bs-list-group-active-bg) r g b / 50%)
+}
+
+.livelist-item {
+    box-sizing: border-box;
+}
+
+.livelist-item.list-group-item.drag-before,
+.livelist-item.list-group-item.drag-after,
+.livelist-break.drag-before,
+.livelist-break.drag-after {
+    z-index: 2;
+}
+
+.livelist-item.list-group-item.drag-before::before,
+.livelist-break.drag-before::before {
+    content: "";
+    position: absolute;
+    top: -1px;
+    left: 0;
+    right: 0;
+    height: 5px;
+    background-color: var(--bs-primary);
+    border-radius: 2px;
+    z-index: 1;
+}
+
+.livelist-item.list-group-item.drag-after::after,
+.livelist-break.drag-after::after {
+    content: "";
+    position: absolute;
+    bottom: -1px;
+    left: 0;
+    right: 0;
+    height: 5px;
+    background-color: var(--bs-primary);
+    border-radius: 2px;
+    z-index: 1;
+}
+
+/* Playlist item styling */
+.livelist-item {
+    transition: background-color 0.2s;
+}
+
+.livelist-item.dragging {
+    opacity: 0.5;
+    background-color: rgba(0, 0, 0, 0.1);
+}
+
+.livelist-item.playing {
+    background-color: rgba(25, 135, 84, 0.2);
+    box-shadow: inset 4px 0px rgba(25, 135, 84, 0.8);
+}
+
+/* Break item styling */
+.livelist-break {
+    position: relative;
+    box-sizing: border-box;
+    transition: background-color 0.2s;
+    background-color: var(--bs-card-cap-bg, rgba(0, 0, 0, 0.03));
+}
+
+.livelist-break.dragging {
+    opacity: 0.5;
+    background-color: rgba(0, 0, 0, 0.1);
+}
+
+.mode-move .livelist-break .drag-handle {
+    cursor: grab;
+}
+
+.mode-move .livelist-break .drag-handle:active {
+    cursor: grabbing;
+}
+
+.mode-move .livelist-break .set1-grip-disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+/* Set 1 delete button — disabled placeholder so anchor aligns with other set headers */
+.livelist-break .set1-delete-disabled {
+    opacity: 0.15;
+    pointer-events: none;
+    cursor: default;
+}
+
+/* Set 1 selectbox — disabled placeholder so it aligns with other break selectboxes */
+.livelist-break .set1-select-disabled {
+    opacity: 0.3;
+    pointer-events: none;
+    cursor: not-allowed;
+}
+
+
+/* Song list styling */
+.song-item.selected {
+    background-color: rgba(13, 110, 253, 0.2);
+}
+
+#songlist-panel .offcanvas-header .btn-close {
+    margin-left: 0;
+}
+
+#songlist-panel .offcanvas-header .btn-pin {
+    margin-left: 0;
+}
+
+#songlist-panel-edit {
+    margin-left: auto;
+}
+
+/* Song list tag spacing */
+.songlist-item-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25em;
+    margin-top: 0.15em;
+}
+
+/* Song list edit */
+#edit-song-tags {
+    display: flex;
+    flex-wrap: wrap;
+}
+
+/* Keypad styling */
+.keypad-btn {
+    flex-grow: 1;
+    width: 30%;
+    height: 60px;
+    font-size: 0.8rem;
+}
+
+#keypad-container {
+    justify-content: center;
+    display: grid;
+}
+
+#keypad-container>div {
+    max-width: 15em;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .playlist-item .btn-group {
+        flex-direction: column;
+    }
+
+    /*
+    .keypad-btn {
+        width: 50px;
+        height: 50px;
+    }
+    */
+}

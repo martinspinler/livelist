@@ -3,7 +3,7 @@
 from datetime import datetime
 from typing import Dict, Optional
 
-from flask import Flask, render_template, request
+from flask import Flask, render_template, request, session
 from flask_socketio import SocketIO, emit, join_room, leave_room
 
 from sqlalchemy import and_
@@ -13,6 +13,7 @@ from .config import load_config
 from .config.settings import Config
 from .models import Band, Song, Playlist, PlaylistItem, db
 from .routes import api_bp, auth_bp, views_bp
+from .routes.views import get_privileges
 
 
 # TODO: TAGS, edit song, create song
@@ -70,6 +71,8 @@ def before_request():
 
 def get_current_band() -> Band:
     """get current band based on subdomain or url parameter"""
+
+    return session.band
     #return db.session.query(Band).get(clients[request.sid]['band'])
     #return request.currentBand
     #from flask import request
@@ -187,9 +190,13 @@ clients = {}
 def handle_connect(auth):
     """Handle WebSocket connection"""
     print("Connected WS", request, auth)
+    if get_privileges(auth["band"], auth["key"]) is None:
+        return False
+
+    band = db.session.query(Band).filter_by(addr=auth["band"]).first()
+    session.band = band
     #clients[request.sid] = auth.copy()
 
-    band = get_current_band()
     if band:
         join_room(f"band_{band.id}")
         emit("connected", {"band_id": band.id})

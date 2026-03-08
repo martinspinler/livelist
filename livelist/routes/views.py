@@ -2,25 +2,74 @@
 HTML views for Livelist
 """
 
-from flask import redirect, render_template, request, url_for
+import flask.json
+from flask import redirect, render_template, request, url_for, make_response, current_app
+from datetime import date
 
 from ..models import Band, Playlist, db
 from . import views_bp
 
 
+def get_privileges(band_name, key):
+    all_bands = current_app.config["BANDS_CONFIG"]
+    if band_name in all_bands:
+        access_key = all_bands[band_name]["access"]["edit"]["password"]
+        if access_key == key:
+            return "edit"
+    return None
+
+def check_privileges():
+    auth_cookie = flask.json.loads(request.cookies.get('auth_data_simple', "{}"))
+    for band_name, key in auth_cookie.items():
+        if get_privileges(band_name, key):
+            return key
+    return None
+
 @views_bp.route("/")
 def index():
-    b = _get_current_band()
-    if b is not None:
-        return view_band(b.name)
-    return render_template("404.html")
+    auth_cookie = flask.json.loads(request.cookies.get('auth_data_simple', "{}"))
+    auth_bands = []
+    for band_name, key in auth_cookie.items():
+        if get_privileges(band_name, key):
+            auth_bands.append(band_name)
+    #print(data)
+    #b = _get_current_band()
+    #if b is not None:
+    #    return view_band(b.name)
+    bands = (
+        db.session.query(Band)
+        .filter(Band.addr.in_(auth_bands))
+        .all()
+    )
+    return render_template("index.html", bands=bands, bad_access=(request.args.get("auth_failed") is not None))
+
+
+@views_bp.route("/login", methods=["POST"])
+def login():
+    auth_cookie = flask.json.loads(request.cookies.get('auth_data_simple', "{}"))
+    band_name = request.form.get("band_name")
+    key = request.form.get("band_access_key")
+    if get_privileges(band_name, key):
+        response = make_response(redirect(f'/band/{band_name}'))
+        auth_cookie[band_name] = key
+        response.set_cookie('auth_data_simple', flask.json.dumps(auth_cookie))
+        return response
+
+    response = make_response(redirect('/?auth_failed'))
+    return response
+
 
 @views_bp.route("/band/<band>/")
 def view_band(band):
     """Main playlist interface"""
     # Get band from subdomain or default
+    key = check_privileges()
+    if key is None:
+        return make_response(redirect('/?auth_failed'))
+
     band = _get_current_band(band)
-    if not band:
+    if band is None:
+        return make_response(redirect('/?auth_failed'))
         return render_template("404.html")
         return redirect(url_for("views.band_selection"))
 
@@ -38,20 +87,18 @@ def view_band(band):
             .first()
         )
 
-    # Get today's date for new playlist form
-    from datetime import date
-
     date_today = date.today().isoformat()
     jinja_script = f"""<script>
         function jinja_update(state) {{
             state.currentBand = {band.id};
             state.currentPlaylist = { playlist.id if playlist else 'null' };
             state.activePlaylist = { playlist.id if playlist else 'null' };
+            state.socket_auth = {{auth: {{band: "{band.addr}", key: "{key}"}}}};
         }}
         </script>
     """
     return render_template(
-        "index.html", band=band, playlist=playlist, date_today=date_today, jinja_script=jinja_script
+        "band.html", band=band, playlist=playlist, date_today=date_today, jinja_script=jinja_script
     )
 
 

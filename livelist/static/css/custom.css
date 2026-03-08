@@ -51,18 +51,18 @@ li.livelist-item .drag-handle:active {
 }
 
 /* Playlist item styling */
-.playlist-item {
+.livelist-item {
     transition: background-color 0.2s;
 }
 
-.playlist-item.dragging {
+.livelist-item.dragging {
     opacity: 0.5;
     background-color: rgba(0, 0, 0, 0.1);
 }
 
-.playlist-item.playing {
+.livelist-item.playing {
     background-color: rgba(25, 135, 84, 0.2);
-    box-shadow: inset 4px 0px #007bff;
+    box-shadow: inset 4px 0px rgba(25, 135, 84, 0.8);
 }
 
 /* Song list styling */

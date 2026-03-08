@@ -7,10 +7,12 @@ Current alternative is anchor inside header-item
 as BEGIN-item and adding AFTER anchor (of course anchor is livelist-item as well),
 together with moving anchor with every add.
 TODO: retain anchor when update_playlist (it moves anchor at end)
+
+TODO: handle playlist name/date update in nav/header
 */
 
-function initApplication(socket_initdata) {
-    const socket = state.io(window.Location.host, socket_initdata);
+function initApplication() {
+    const socket = state.io(window.Location.host, state.socket_auth);
     state.socket = socket;
 
     setupEventListeners();
@@ -42,12 +44,21 @@ function initApplication(socket_initdata) {
 
     /* Livelist */
     function livelist_update_playing_item(itemId) {
+        const old_ie = document.querySelectorAll('.livelist-item');
+        const new_ie = document.querySelector(`.livelist-item[data-item-id="${itemId}"]`);
         const old_e = document.querySelectorAll('.livelist-item-play');
         const new_e = document.querySelector(`.livelist-item[data-item-id="${itemId}"] .livelist-item-play`);
+
+        old_ie.forEach(item => {
+            item.classList.remove('playing');
+        });
+        new_ie?.classList.add('playing');
+
         old_e.forEach(item => {
             item.classList.remove('btn-success');
             item.classList.add('btn-outline-success');
         });
+
         new_e?.classList.remove('btn-outline-success');
         new_e?.classList.add('btn-success');
     }
@@ -284,7 +295,7 @@ function initApplication(socket_initdata) {
         function handle_livelist_item_select(pi) {
             if (true || state.editMode == false) {
                 livelist_item_set_current(/*state.currentItem == pi ? null : */pi);
-                /* TODO: clean-up */ 
+                /* TODO: clean-up */
                 //pi.getElementById("livelist-header-anchor").classList.remove("d-none");
                 /*
                 document.getElementById("song-insert-after").toggleAttribute("disabled", state.currentItem == null);
@@ -349,6 +360,13 @@ function initApplication(socket_initdata) {
                     event.stopPropagation();
                 }
             } else if (target.classList.contains("clipboard-copy-set")) {
+                let str = "";
+                state.playlist.items.forEach(
+                    item => {
+                        str += String(item.position + 1) + ". " + item.song.name + "\n";
+                    }
+                )
+                navigator.clipboard.writeText(str)
                 event.stopPropagation();
             } else if (target.closest("#livelist-header")) {
                 livelist_item_set_current(null);
@@ -404,8 +422,8 @@ function initApplication(socket_initdata) {
 
     function editPlaylist(id) {
         const qry = `.playlist-btn-select[data-playlist-id="${id}"]`;
-        const pn = document.querySelector(qry).querySelector(".list-playlist-name");
-        const pd = document.querySelector(qry).querySelector(".list-playlist-date");
+        const pn = document.querySelector(qry).querySelector(".playlist-item-name");
+        const pd = document.querySelector(qry).querySelector(".playlist-item-date");
         document.getElementById('edit-playlist-id').value = id;
         document.getElementById('edit-playlist-name').value = pn.innerHTML;
         document.getElementById('edit-playlist-date').value = pd.innerHTML;

@@ -1,16 +1,17 @@
 #!/usr/bin/env python3
 
-import uuid
 from datetime import datetime
 from typing import Dict, Optional
 
 from flask import Flask, render_template, request
 from flask_socketio import SocketIO, emit, join_room, leave_room
 
+from sqlalchemy import and_
+
 from .config import load_config
 
 from .config.settings import Config
-from .models import Band, Playlist, PlaylistItem, db
+from .models import Band, Song, Playlist, PlaylistItem, db
 from .routes import api_bp, auth_bp, views_bp
 
 
@@ -343,6 +344,7 @@ def add_playlist_item(data):
     db.session.add(item)
     db.session.commit()
 
+    # TODO: add metadata with added id (result)
     if target_id:
         data = dict(
             playlist_id=playlist_id,
@@ -365,7 +367,7 @@ def on_move(data):
     target_id = data.get("target_id")
     moved_dict = {x: moved_ids.index(x.id) for x in items if x.id in moved_ids}
     moved = list(dict(sorted(moved_dict.items(), key=lambda item: item[1])).keys())
-    target = [x for x in items if x.id == target_id][0]
+    target = ([x for x in items if x.id == target_id] + [None])[0]
     result = []
     if target in moved:
         #del moved[target]
@@ -387,15 +389,20 @@ def on_move(data):
     handle_playlist_update({"playlist_id": playlist_id})
 
 
-@socketio.on("delete_item")
+@socketio.on("delete_items")
 def on_delete_item(data):
-    item = db.session.get_one(PlaylistItem, data.get("item_id"))
-
     playlist_id = data.get("playlist_id")
-    if item.playlist_id != playlist_id:
-        return
+    items = (
+        db.session.query(PlaylistItem)
+        .filter(and_(
+            PlaylistItem.id.in_(data.get("item_ids")),
+            PlaylistItem.playlist_id==playlist_id,
+        ))
+        .all()
+    )
 
-    db.session.delete(item)
+    for item in items:
+        db.session.delete(item)
     db.session.commit()
 
     items = (
@@ -475,32 +482,29 @@ def on_save_playlist(data):
     emit("playlists", res, to=f'band_{band.id}')
 
 
-#@socketio.on("bulk_reorder")
-#def handle_bulk_reorder(data: Dict):
-#    """Handle bulk reorder of playlist items"""
-#    band = get_current_band()
-#    if not band:
-#        return
-#
-#    playlist_id = data.get("playlist_id")
-#    new_order = data.get("new_order")  # List of {id, position}
-#
-#    # Validate playlist belongs to band
-#    playlist = db.session.query(Playlist).get(playlist_id)
-#    if not playlist or playlist.band_id != band.id:
-#        emit("error", {"message": "Invalid playlist"})
-#        return
-#
-#    # Apply reordering
-#    if bulk_reorder_playlist(playlist_id, new_order):
-#        # Broadcast update
-#        emit(
-#            "playlist_reordered",
-#            {"playlist_id": playlist_id, "new_order": new_order},
-#            room=f"band_{band.id}",
-#        )
-#    else:
-#        emit("error", {"message": "Failed to reorder playlist"})
+@socketio.on("get_songlist")
+def get_songs(data):
+    band = get_current_band()
+
+    songs = db.session.query(Song).filter_by(band_id=band.id).order_by(Song.name).all()
+
+    res = [
+        {
+            "id": s.id,
+            #"uuid": s.uuid,
+            "name": s.name,
+            "user_id": s.user_id,
+            "bpm": s.bpm,
+            "notes": s.notes,
+            "filename": s.filename,
+            "store": s.store,
+            #"meta": json.loads(s.meta) if s.meta else None,
+            "tags": [tag.name for tag in s.tags],
+        }
+        for s in songs
+    ]
+
+    emit("songlist", res)
 
 
 # Error handlers

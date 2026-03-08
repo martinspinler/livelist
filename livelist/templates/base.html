@@ -12,17 +12,6 @@
     <link href="{{ url_for('static', filename='css/custom.css') }}" rel="stylesheet">
     <link rel="shortcut icon" href="{{ url_for('static', filename='favicon.ico') }}">
 
-    <!-- e-html Framework -->
-    <script type="importmap">
-    {
-        "imports": {
-            "#ehtml/": "{{ url_for('static', filename='js/ehtml/') }}",
-            "#ehtml/main": "{{ url_for('static', filename='js/ehtml/main.js') }}"
-        }
-    }
-    </script>
-    <script type="module">import "#ehtml/main";</script>
-
     {% block extra_head %}{% endblock %}
 </head>
 <body>

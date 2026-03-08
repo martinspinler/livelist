@@ -1,29 +1,24 @@
-function initDragAndDrop(s) {
-    const playlist = document.querySelector("#playlist");
+function initDragAndDrop(s, handle_drag_and_drop) {
+    const livelist = document.querySelector("#livelist-items");
     const state = s;
 
     let draggedItem = null;
     let draggedItemId = null;
     let targetItem = null;
 
-    playlist.addEventListener('dragstart', onDragStart);
-    playlist.addEventListener('dragover', onDragOver);
-    playlist.addEventListener('dragleave', onDragLeave);
-    playlist.addEventListener('drop', onDragDrop);
-    playlist.addEventListener('dragend', onDragEnd);
+    livelist.addEventListener('dragstart', onDragStart);
+    livelist.addEventListener('dragover', onDragOver);
+    livelist.addEventListener('dragleave', onDragLeave);
+    livelist.addEventListener('drop', onDragDrop);
+    livelist.addEventListener('dragend', onDragEnd);
 
     function onDragStart(e) {
         if (!e.target.classList.contains('drag-handle')) {
             return;
         }
 
-        draggedItem = e.target.closest(".playlist-item");
-
-        // Get the parent list item (the actual draggable item)
-        //draggedItem = e.target.parentElement;
+        draggedItem = e.target.closest(".livelist-item");
         draggedItemId = draggedItem.dataset.itemId;
-
-        // Visual feedback on the handle
         draggedItem.classList.add('dragging');
         e.dataTransfer.effectAllowed = 'move';
         //e.dataTransfer.setData('text/plain', draggedItemId);
@@ -40,7 +35,7 @@ function initDragAndDrop(s) {
         e.stopPropagation();
 
         // Check if the event target is a drag handle
-        const targetItem = e.target.closest(".playlist-item");
+        const targetItem = e.target.closest(".livelist-item");
         if (!targetItem || targetItem == draggedItem) {
             return;
         }
@@ -65,7 +60,7 @@ function initDragAndDrop(s) {
         e.stopPropagation();
 
         // Check if the event target is a drag handle
-        const targetItem = e.target.closest(".playlist-item");
+        const targetItem = e.target.closest(".livelist-item");
         if (!targetItem) {
             return;
         }
@@ -78,7 +73,7 @@ function initDragAndDrop(s) {
         e.stopPropagation();
 
         // Check if the event target is a drag handle
-        const targetItem = e.target.closest(".playlist-item");
+        const targetItem = e.target.closest(".livelist-item");
         if (!targetItem) {
             return;
         }
@@ -106,9 +101,8 @@ function initDragAndDrop(s) {
 //                item_id: pid,
                 playlist_id: state.currentPlaylist,
             }
-            const message = JSON.stringify(msg);
 
-            state.socket.emit("move_item", msg);
+			handle_drag_and_drop(msg);
         } else {
         }
 
@@ -119,7 +113,7 @@ function initDragAndDrop(s) {
 
     function onDragEnd(e) {
         // Clean up any remaining drag classes
-        const items = playlist.querySelectorAll('.list-group-item');
+        const items = livelist.querySelectorAll('.list-group-item');
         items.forEach(item => {
             item.classList.remove('dragging', 'drag-over', 'drag-before', 'drag-after', 'd-none');
 

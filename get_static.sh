@@ -18,6 +18,8 @@ mv bootstrap-icons-*/fonts/* livelist/static/css/fonts/
 rm -rf bootstrap-icons-*
 
 wget -O livelist/static/js/bootstrap.bundle.min.js https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js
+wget -O livelist/static/js/bootstrap.bundle.min.js.map https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js.map
 wget -O livelist/static/js/socket.io.min.js https://cdn.socket.io/3.1.3/socket.io.min.js
+wget -O livelist/static/js/socket.io.min.js.map https://cdn.socket.io/3.1.3/socket.io.min.js.map
 
 rm bootstrap-icons.zip ehtml.zip

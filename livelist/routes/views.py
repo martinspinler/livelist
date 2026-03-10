@@ -27,11 +27,16 @@ def check_privileges():
 
 @views_bp.route("/")
 def index():
+    subdomain = request.host.split(".")[0] if "." in request.host else None
+    if subdomain is not None and request.host in ["localhost"]:
+        return view_band_noredirect(subdomain)
+
     auth_cookie = flask.json.loads(request.cookies.get('auth_data_simple', "{}"))
     auth_bands = []
     for band_name, key in auth_cookie.items():
         if get_privileges(band_name, key):
             auth_bands.append(band_name)
+
     #print(data)
     #b = _get_current_band()
     #if b is not None:
@@ -61,6 +66,17 @@ def login():
 
 @views_bp.route("/band/<band>/")
 def view_band(band):
+    bands = (
+        db.session.query(Band)
+        .filter_by(addr=band)
+        .all()
+    )
+    # FIXME: Check only for ALLOWED subdomains
+    if bands and request.host in ["localhost"]:
+        return redirect(request.scheme + "://" + band + "." + request.host)
+    return view_band_noredirect(band)
+
+def view_band_noredirect(band):
     """Main playlist interface"""
     # Get band from subdomain or default
     key = check_privileges()

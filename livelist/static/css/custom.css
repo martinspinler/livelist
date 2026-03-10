@@ -1,18 +1,18 @@
-/* Custom CSS for Livelist */
-
-/* Drag and drop styling */
 .dragging {
     opacity: 0.5;
 }
 
 .drag-handle {
     cursor: move;
-    opacity: 0.5;
+/*    opacity: 0.5;*/
     transition: opacity 0.2s;
 }
 
 .drag-handle:hover {
     opacity: 1;
+}
+.container-fluid {
+    --bs-gutter-x: 1.0em;
 }
 
 .drag-handle {
@@ -20,8 +20,17 @@
 }
 
 /* Livelist item styling */
+
+.livelist-item.list-group-item-action {
+	color: var(--bs-list-group-color);
+}
+
 li.livelist-item .drag-handle:active {
     cursor: grabbing;
+}
+#livelist-header {
+    padding-top: 0.3em;
+    padding-bottom: 0.3em;
 }
 
 .livelist-item {
@@ -40,14 +49,14 @@ li.livelist-item .drag-handle:active {
 
 .livelist-item.list-group-item.drag-before {
 /*    border-top: 2px dashed #0d6efd;*/
-    box-shadow: inset 2px 4px 0px #0d6efd,
+    box-shadow: inset 2px 7px 0px #0d6efd,
                 inset -2px -2px 0px #0d6efd;
 }
 
 .livelist-item.list-group-item.drag-after {
 /*    border-bottom: 2px dashed #0d6efd;*/
     box-shadow: inset 2px 2px 0px #0d6efd,
-                inset -2px -4px 0px #0d6efd;
+                inset -2px -7px 0px #0d6efd;
 }
 
 /* Playlist item styling */

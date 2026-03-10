@@ -52,7 +52,7 @@ def login():
     if get_privileges(band_name, key):
         response = make_response(redirect(f'/band/{band_name}'))
         auth_cookie[band_name] = key
-        response.set_cookie('auth_data_simple', flask.json.dumps(auth_cookie))
+        response.set_cookie('auth_data_simple', flask.json.dumps(auth_cookie), max_age=60*60*24*365*2)
         return response
 
     response = make_response(redirect('/?auth_failed'))

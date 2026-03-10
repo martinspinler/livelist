@@ -39,7 +39,7 @@ function initApplication() {
             msg.moved_ids = state.selection;
         }
         state.socket.emit("move_item", msg);
-        state.selection.length = 0
+        state.selection.length = 0;
     }
 
     /* Livelist */
@@ -95,6 +95,18 @@ function initApplication() {
         livelist_update_playing_item(msg.active_item_id);
         songlist_update_used_items(msg.items);
         update_edit_mode();
+    }
+
+    function livelist_update_item_numbers() {
+        document.querySelectorAll(".livelist-item").forEach(
+            item => item.querySelectorAll(".livelist-item-selectbox").forEach(subitem => {
+                const pos = state.selection.indexOf(parseInt(item.dataset.itemId));
+                    subitem.innerHTML = pos >= 0 ? ("&nbsp;" + String(pos + 1)) : "";
+                    subitem.classList.toggle("btn-outline-warning", pos == -1);
+                    subitem.classList.toggle("btn-warning", pos != -1);
+                }
+            )
+        );
     }
 
     function livelist_item_set_current(pi) {
@@ -249,19 +261,6 @@ function initApplication() {
         document.getElementById('songlist-panel-pin').addEventListener('click', handle_songlist_panel_pin);
         document.getElementById('livelist-delete-selected').addEventListener('click', handle_livelist_delete_selected);
 
-        function livelist_update_item_numbers() {
-            document.querySelectorAll(".livelist-item").forEach(
-                item => item.querySelectorAll(".livelist-item-selectbox").forEach(subitem => {
-                    const pos = state.selection.indexOf(parseInt(item.dataset.itemId));
-                    if (pos >= 0) {
-                        subitem.innerHTML = "&nbsp;" + String(pos + 1);
-                    }
-                        subitem.classList.toggle("btn-outline-warning", pos == -1);
-                        subitem.classList.toggle("btn-warning", pos != -1);
-                    }
-                )
-            );
-        }
 
         function handle_livelist_item_number(pi, itemId) {
             if (state.selection.includes(itemId)) {
@@ -376,6 +375,16 @@ function initApplication() {
 
     function toggleEditMode() {
         state.editMode = !state.editMode;
+        state.selection.length = 0;
+        livelist_update_item_numbers();
+
+        if (!state.editMode) {
+            document.querySelectorAll(".livelist-item.list-group-item-warning").forEach(
+                item => {
+                    item.classList.toggle("list-group-item-warning", false);
+                }
+            );
+        }
         update_edit_mode();
     }
 

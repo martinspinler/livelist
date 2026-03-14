@@ -6,10 +6,6 @@
 <script type="text/javascript" src="{{ url_for('static', filename='js/socket.io.min.js') }}"></script>
 <script type="text/javascript" src="{{ url_for('static', filename='js/app.js') }}"></script>
 <script type="text/javascript" src="{{ url_for('static', filename='js/dnd.js') }}"></script>
-<script>
-    var state = {};
-</script>
-
 {% endblock %}
 
 {% block content %}
@@ -44,6 +40,7 @@
         <div class="flex-grow-1">
             <div class="song-name"></div>
             <small class="song-user_id text-muted"></small>
+            <small class="song-tags text-muted"></small>
         </div>
             <button class="btn livelist-item-anchor d-none">&#x2693;</button>
         <div class="btn-group xbtn-group-sm livelist-item-btn-group-right">
@@ -53,11 +50,20 @@
     </li>
 </template>
 
+
+<template id="songlist-tag-template">
+    <small class="songlist-item-tag badge text-bg-info text-muted"></small>
+</template>
+
+
 <template id="songlist-item-template">
     <button class="list-group-item list-group-item-action d-flex justify-content-between align-items-center songlist-item">
         <div>
-            <div class="songlist-name fw-bold"></div>
-            <small class="songlist-meta text-muted"></small>
+            <div class="songlist-item-name fw-bold"></div>
+            <small class="songlist-item-meta text-muted"></small>
+
+            <div class="songlist-item-tags">
+            </div>
         </div>
         <span class="badge bg-primary rounded-pill">+</span>
     </button>
@@ -146,13 +152,27 @@
                 <button class="btn btn-sm btn-outline-primary bi bi-sort-alpha-down" id="sort-alpha">A-Z</button>
                 <button class="btn btn-sm btn-outline-primary bi bi-sort-numeric-down" id="sort-bpm">BPM</button>
                 <button class="btn btn-sm btn-outline-primary bi bi-sort-down" id="sort-id">ID</button>
-                <div class="flex-grow-1">
-                    <select class="form-select form-select-sm" id="tag-filter">
+                <button class="btn btn-sm btn-outline-primary bi bi-tags" id="tag-filter-btn">Tags</button>
+                <div class="flex-grow-1 d-none">
+                    <select class="form-select form-select-sm" id="xtag-filter">
                         <option value="">All Tags</option>
                         <!-- Tags will be populated by JavaScript -->
                     </select>
                 </div>
+
             </div>
+
+            <template id="tagfilter-template">
+                <button class="badge btn btn-sm btn-outline-primary mx-1 tag-filter-item"></button>
+            </template>
+            <div class="d-none" id="tag-filter">
+                <div class="w-100 gap-2" id="tag-filter-list"></div>
+                <!--
+                <hr/>
+                <div class="w-100 gap-2" id="tag-filter-active"></div>
+                -->
+            </div>
+
             <div class="d-none">
                 <input type="radio" class="btn-check " name="song-insert" id="song-insert-before" autocomplete="off" data-bs-title="AAA">
                 <label class="btn btn-sm btn-outline-primary bi bi-arrow-bar-up" for="song-insert-before">Before</label>
@@ -226,7 +246,7 @@
 {% block scripts %}
 {{ jinja_script | safe }}
 <script>
-    state = {
+    var state = {
         io: io,
         editMode: false,
         selectedItems: new Set(),
@@ -242,6 +262,7 @@
         activePlaylist: null,
 
         playlist: null,
+        songlist: [],
         usedSongs: [],
         socket_auth: {
             auth: {

@@ -78,6 +78,7 @@ function initApplication() {
                 item_e.dataset.itemId = item.id;
                 item_e.dataset.songId = item.song_id;
                 item_e.querySelector('.song-name').textContent = item.song.name;
+                item_e.querySelector('.song-tags').textContent = item.song.tags.join(",");
                 item_e.querySelector('.song-user_id').textContent =
                     (item.song.user_id ? item.song.user_id + ' - ' : '') + (item.song.notes || '');
                 item_e.querySelector('.livelist-item-position').textContent = item.position + 1;
@@ -142,6 +143,30 @@ function initApplication() {
 
     function songlist_update(msg) {
         document.getElementById('song-list').innerHTML = "";
+        //document.getElementById('tag-filter-active').textContent = "";
+        const tag_filter = document.getElementById('tag-filter-list');
+        const all_tags = [];
+
+        function add_tag(tag) {
+            if (all_tags.indexOf(tag) == -1) {
+                all_tags.push(tag);
+
+                const tmpl = document.getElementById("tagfilter-template").content.cloneNode(true);
+                const ti = tmpl.querySelector('.tag-filter-item');
+                ti.textContent = tag;
+                if (tag == "NOT") {
+                    ti.dataset.tagType = "NOT";
+                } else {
+                    ti.dataset.tagType = "";
+                }
+                tag_filter.appendChild(ti);
+            }
+        }
+
+        state.songlist = new Map(msg.map(s => Array(s.id, s)));
+
+        ["NOT"].forEach(item => add_tag(item));
+
         msg.forEach(
             item => {
                 const tmpl = document.getElementById("songlist-item-template").content.cloneNode(true);
@@ -152,11 +177,22 @@ function initApplication() {
                 pi.dataset.songBpm = item.bpm;
                 songlist_update_used_item(pi);
 
-                pi.querySelector('.songlist-name').textContent = item.name;
-                pi.querySelector('.songlist-meta').textContent =
+                pi.querySelector('.songlist-item-name').textContent = item.name;
+                pi.querySelector('.songlist-item-meta').textContent =
                     (item.user_id ? item.user_id + ' · ' : '') +
-                    (item.bpm ? 'BPM: ' + item.bpm + ' · ' : '') +
-                    (item.tags ? item.tags.join(', ') : '');
+                    (item.bpm ? 'BPM: ' + item.bpm + ' · ' : '');
+
+                item.tags.forEach(
+                    tag => {
+                        const tag_tmpl = document.getElementById("songlist-tag-template").content.cloneNode(true);
+                        const tag_item = tag_tmpl.querySelector('.songlist-item-tag');
+                        tag_item.textContent = tag;
+                        /*tag_item.querySelector('.songlist-item-tag').textContent =
+                        (item.tags ? item.tags.join(', ') : '');*/
+                        pi.querySelector('.songlist-item-tags').appendChild(tag_item);
+                        add_tag(tag);
+                    }
+                );
 
                 document.getElementById('song-list').appendChild(pi);
             }
@@ -254,14 +290,19 @@ function initApplication() {
         document.getElementById('sort-alpha').addEventListener('click', () => sortSongs('alpha'));
         document.getElementById('sort-bpm').addEventListener('click', () => sortSongs('bpm'));
         document.getElementById('sort-id').addEventListener('click', () => sortSongs('id'));
-        document.getElementById('tag-filter').addEventListener('change', filterSongs);
+        //document.getElementById('tag-filter').addEventListener('change', filterSongs);
+        document.getElementById('tag-filter-btn').addEventListener('click', handle_tag_filter_btn);
         document.getElementById('create-playlist-btn').addEventListener('click', playlist_new);
         document.getElementById('save-playlist-changes').addEventListener('click', playlist_save);
         document.getElementById('edit-sort').addEventListener('click', editSort);
         document.getElementById('songlist-panel-pin').addEventListener('click', handle_songlist_panel_pin);
         document.getElementById('livelist-delete-selected').addEventListener('click', handle_livelist_delete_selected);
 
-
+        function handle_tag_filter_btn(ev) {
+            document.getElementById('tag-filter').classList.toggle('d-none');
+            document.getElementById('tag-filter-btn').classList.toggle('bi-tags');
+            document.getElementById('tag-filter-btn').classList.toggle('bi-tags-fill');
+        }
         function handle_livelist_item_number(pi, itemId) {
             if (state.selection.includes(itemId)) {
                 const index = state.selection.indexOf(itemId);
@@ -348,6 +389,7 @@ function initApplication() {
             const livelist_item = target.closest(".livelist-item");
             const songlist_item = target.closest(".songlist-item");
             const playlist_item = target.closest(".playlist-item");
+            const tag_filter_item = target.closest(".tag-filter-item");
 
             if (livelist_item) {
                 handle_livelist_item_click(target, livelist_item, parseInt(livelist_item.dataset.itemId));
@@ -358,6 +400,42 @@ function initApplication() {
                 if (ret) {
                     event.stopPropagation();
                 }
+            } else if (tag_filter_item) {
+                if (tag_filter_item.textContent == "NOT") {
+                    tag_filter_item.classList.toggle("btn-outline-primary");
+                    tag_filter_item.classList.toggle("btn-primary");
+                } else {
+                    const tag_filter_list = tag_filter_item.closest('#tag-filter-list');
+                    if (tag_filter_item.classList.contains("btn-outline-primary")) {
+                        if (tag_filter_list.querySelector('button[data-tag-type="NOT"]').classList.contains("btn-primary")) {
+                            tag_filter_item.classList.toggle("btn-outline-primary");
+                            tag_filter_item.classList.toggle("btn-danger");
+                        } else {
+                            tag_filter_item.classList.toggle("btn-outline-primary");
+                            tag_filter_item.classList.toggle("btn-success");
+                        }
+                    } else {
+                        tag_filter_item.classList.toggle("btn-outline-primary");
+                        tag_filter_item.classList.toggle("btn-success", false);
+                        tag_filter_item.classList.toggle("btn-danger", false);
+                    }
+
+                    /*
+                    const tag_filter_active = document.getElementById('tag-filter-active');
+                    const tag_filter_list = tag_filter_item.closest('#tag-filter-list');
+                    if (tag_filter_list != null) {
+                        const ti = tag_filter_item.cloneNode(true);
+                        if (tag_filter_list.querySelector('button[data-tag-type="NOT"]').classList.contains("btn-outline-primary")) {
+                    //tag_filter_item.classList.toggle("btn-outline-primary");
+                            ti.classList.add("text-decoration-line-through");
+                        }
+                        tag_filter_active.appendChild(ti);
+                    } else {
+                        tag_filter_active.removeChild(tag_filter_item);
+                    }*/
+
+                    filterSongs();
+                }
             } else if (target.classList.contains("clipboard-copy-set")) {
                 let str = "";
                 state.playlist.items.forEach(
@@ -365,7 +443,7 @@ function initApplication() {
                         str += String(item.position + 1) + ". " + item.song.name + "\n";
                     }
                 )
-                navigator.clipboard.writeText(str)
+                navigator.clipboard.writeText(str);
                 event.stopPropagation();
             } else if (target.closest("#livelist-header")) {
                 livelist_item_set_current(null);
@@ -490,9 +568,39 @@ function initApplication() {
 
         const re = new RegExp(res, "i");
         const el = document.getElementsByClassName("songlist-item");
+
+        function songInActiveTags(id) {
+            const tfa = document.getElementById('tag-filter-list');
+            const songTags = state.songlist.get(id).tags;
+            var empty = true;
+            var inlist = false;
+            tfa.querySelectorAll(".btn-danger").forEach(
+                item => {
+                    //empty = false;
+                    if (songTags.indexOf(item.textContent) >= 0) {
+                        inlist = true;
+                    }
+                }
+            );
+            if (inlist)
+                return false;
+
+            empty = true;
+            tfa.querySelectorAll(".btn-success").forEach(
+                item => {
+                    empty = false;
+                    if (songTags.indexOf(item.textContent) >= 0) {
+                        inlist = true;
+                    }
+                }
+            );
+            if (inlist)
+                return true;
+            return empty;
+        }
         Array.from(el).forEach(
             (e) => {
-                if (re.test(e.dataset.songName)) {
+                if (re.test(e.dataset.songName) && songInActiveTags(parseInt(e.dataset.songId))) {
                     e.classList.remove("d-none");
                 } else {
                     e.classList.add("d-none");

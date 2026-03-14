@@ -24,6 +24,12 @@
 .livelist-item.list-group-item-action {
 	color: var(--bs-list-group-color);
 }
+.songlist-item.list-group-item.active{
+    background-color: rgb(from var(--bs-list-group-active-bg) r g b / 50%)
+}
+.playlist-item.list-group-item.active {
+    background-color: rgb(from var(--bs-list-group-active-bg) r g b / 50%)
+}
 
 li.livelist-item .drag-handle:active {
     cursor: grabbing;

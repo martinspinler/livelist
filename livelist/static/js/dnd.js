@@ -93,12 +93,10 @@ function initDragAndDrop(s, handle_drag_and_drop) {
             const before = e.clientY < rect.top + rect.height / 2;
 
             // Send async message to server with move instruction
-            // Format: {dragged_id, target_id, before}
             const msg = {
                 moved_ids: [parseInt(draggedPliId)],
                 target_id: parseInt(targetPliId),
                 before: before,
-//                item_id: pid,
                 playlist_id: state.currentPlaylist,
             }
 

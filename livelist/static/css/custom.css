@@ -1,3 +1,7 @@
+.btn:hover {
+    background-color: rgb(from var(--bs-btn-hover-bg) r g b / 60%);
+}
+
 .dragging {
     opacity: 0.5;
 }
@@ -90,7 +94,17 @@ li.livelist-item .drag-handle:active {
 }
 
 #songlist-panel .offcanvas-header .btn-pin {
+    margin-left: 0;
+}
+
+#songlist-panel-edit {
     margin-left: auto;
+}
+
+/* Song list edit */
+#edit-song-tags {
+	display: flex;
+	flex-wrap: wrap;
 }
 
 /* Keypad styling */

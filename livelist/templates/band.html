@@ -52,7 +52,7 @@
 
 
 <template id="songlist-tag-template">
-    <small class="songlist-item-tag badge text-bg-info text-muted"></small>
+    <small class="songlist-item-tag badge text-bg-info text-muted gap-1"></small>
 </template>
 
 
@@ -65,7 +65,8 @@
             <div class="songlist-item-tags">
             </div>
         </div>
-        <span class="badge bg-primary rounded-pill">+</span>
+        <span class="btn btn-sm btn-outline-primary bi bi-plus-circle-fill text-primary songlist-mode-add"></span>
+        <span class="btn btn-sm btn-outline-warning bi bi-pencil-fill text-warning songlist-mode-edit d-none" data-bs-toggle="modal" data-bs-target="#edit-song-modal"></span>
     </button>
 </template>
 
@@ -122,6 +123,7 @@
 <div class="offcanvas offcanvas-start" tabindex="-1" id="songlist-panel">
     <div class="offcanvas-header">
         <h5 class="offcanvas-title">Song Library</h5>
+        <button type="button" class="btn btn-outline-primary bi bi-pencil-fill float-end" id="songlist-panel-edit"></button>
         <button type="button" class="btn btn-pin bi bi-pin-fill float-end" id="songlist-panel-pin"></button>
         <button type="button" class="btn-close" data-bs-dismiss="offcanvas"></button>
     </div>
@@ -130,7 +132,8 @@
         <div class="mb-3">
             <div class="input-group mb-2">
                 <input type="text padding-right" class="form-control" id="song-filter" placeholder="Type or use keypad...">
-                <button class="btn btn-outline-secondary bi bi-keyboard" type="button" id="toggle-keypad"></button>
+                <button class="btn btn-outline-warning bi bi-plus songlist-mode-edit d-none" type="button" id="songlist-song-create"></button>
+                <button class="btn btn-outline-secondary bi bi-keyboard songlist-mode-add" type="button" id="toggle-keypad"></button>
             </div>
             <div class="keypad-container mb-2 d-none" id="keypad-container">
                 <div class="d-flex flex-wrap gap-1 justify-content-center">
@@ -241,6 +244,43 @@
         </div>
     </div>
 </div>
+
+<!-- Edit Song Modal -->
+<div class="modal fade" id="edit-song-modal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Edit Song</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="edit-song-form">
+                    <div class="mb-3">
+                        <label for="edit-song-name" class="form-label">Name</label>
+                        <input type="text" class="form-control" id="edit-song-name" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="edit-song-bpm" class="form-label">BPM</label>
+                        <input type="text" class="form-control" id="edit-song-bpm" required>
+                    </div>
+
+                    <label for="edit-song-tag" class="form-label">Tags</label>
+                    <div id="edit-song-tags" class="gap-1 pb-2"></div>
+                    <div class="mb-3 input-group">
+                        <input type="text" class="form-control" id="edit-song-tag" required>
+                        <button type="button" class="btn btn-primary bi bi-plus" id="edit-song-tag-create"></button>
+                    </div>
+                    <input type="hidden" id="edit-song-id">
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="save-song-changes">Save Changes</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 {% endblock %}
 
 {% block scripts %}

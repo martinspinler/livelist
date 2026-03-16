@@ -9,6 +9,7 @@ together with moving anchor with every add.
 TODO: retain anchor when update_playlist (it moves anchor at end)
 
 TODO: handle playlist name/date update in nav/header
+TODO: fix/clear selection after one delete
 */
 
 function initApplication() {
@@ -26,15 +27,6 @@ function initApplication() {
     });
 
     function handle_drag_and_drop(msg) {
-        /*
-           const msg = {
-           moved_ids: [parseInt(draggedPliId)],
-           target_id: parseInt(targetPliId),
-           before: before,
-        //                item_id: pid,
-        playlist_id: state.currentPlaylist,
-        }
-         */
         if (state.selection.length != 0) {
             msg.moved_ids = state.selection;
         }
@@ -294,8 +286,10 @@ function initApplication() {
         document.getElementById('tag-filter-btn').addEventListener('click', handle_tag_filter_btn);
         document.getElementById('create-playlist-btn').addEventListener('click', playlist_new);
         document.getElementById('save-playlist-changes').addEventListener('click', playlist_save);
+        document.getElementById('save-song-changes').addEventListener('click', song_save);
         document.getElementById('edit-sort').addEventListener('click', editSort);
         document.getElementById('songlist-panel-pin').addEventListener('click', handle_songlist_panel_pin);
+        document.getElementById('songlist-panel-edit').addEventListener('click', handle_songlist_panel_edit);
         document.getElementById('livelist-delete-selected').addEventListener('click', handle_livelist_delete_selected);
 
         function handle_tag_filter_btn(ev) {
@@ -310,15 +304,6 @@ function initApplication() {
 
                 pi.querySelector(".livelist-item-selectbox").textContent = "";
 
-                /*
-                pi.querySelectorAll(".livelist-item-selectbox").forEach(
-                    subitem => {
-                        subitem.textContent = "";
-                        subitem.classList.toggle("bi-square");
-                        subitem.classList.toggle("bi-check-square");
-                        //subitem.classList.toggle("sort-numeric-down");
-                    }
-                );*/
                 pi.classList.toggle("list-group-item-warning", false);
             } else {
                 state.selection.push(itemId);
@@ -364,7 +349,11 @@ function initApplication() {
         }
 
         function handle_songlist_item_click(target, songlist_item, songId) {
-            addSongToPlaylist(songId);
+            if (document.getElementById('songlist-panel-edit').classList.contains("btn-outline-primary")) {
+                addSongToPlaylist(songId);
+            } else {
+                editSong(songId);
+            }
         }
 
         function handle_playlist_item_click(target, playlist_item, playlistId) {
@@ -487,7 +476,6 @@ function initApplication() {
         toggleEditBtn.classList.toggle('btn-outline-success', state.editMode);
         document.getElementById('nav-main').classList.toggle("d-none", state.editMode);
         document.getElementById('nav-edit').classList.toggle("d-none", !state.editMode);
-
     }
 
     function on_livelist_item_play(pid) {
@@ -516,6 +504,33 @@ function initApplication() {
         document.getElementById('edit-playlist-date').value = pd.innerHTML;
     }
 
+    function editSong(id) {
+        const song = state.songlist.get(id);
+        document.getElementById('edit-song-id').value = song.id;
+        document.getElementById('edit-song-name').value = song.name;
+        document.getElementById('edit-song-bpm').value = song.bpm;
+
+        const tagedit = document.getElementById('edit-song-tags');
+		tagedit.textContent = "";
+        state.tags.forEach(
+            item => {
+                const tag_tmpl = document.getElementById("songlist-tag-template").content.cloneNode(true);
+                const tag_item = tag_tmpl.querySelector('.songlist-item-tag');
+                tag_item.textContent = item;
+                tagedit.appendChild(tag_item);
+            }
+        );
+    }
+
+    function song_save() {
+        const data = {
+            id: parseInt(document.getElementById('edit-song-id').value),
+            name: document.getElementById('edit-song-name').value,
+            bpm: document.getElementById('edit-song-bpm').value,
+        }
+        state.socket.emit("save_song", data);
+    }
+
     function addSongToPlaylist(id) {
         const data = { playlist_id: state.currentPlaylist, song_id: id };
         if (state.currentItem/* && !document.getElementById('song-insert-end').checked*/) {
@@ -534,6 +549,7 @@ function initApplication() {
         state.socket.emit("delete_items", { playlist_id: state.currentPlaylist, item_ids: [id] });
     }
 
+    /* Songlist - utils */
     function handleKeypadButton(event) {
         const key = event.target.getAttribute('data-key');
         const filterInput = document.getElementById('song-filter');
@@ -551,14 +567,31 @@ function initApplication() {
         filterInput.dispatchEvent(new Event('input'));
     }
 
-    /* Songlist - utils */
     function handle_songlist_panel_pin(e) {
         e.target.classList.toggle("bi-pin-fill");
         e.target.classList.toggle("bi-pin");
     }
 
+    function handle_songlist_panel_edit(e) {
+        e.target.classList.toggle("btn-outline-primary");
+        e.target.classList.toggle("btn-primary");
+        document.querySelectorAll(".songlist-mode-edit").forEach(item=>item.classList.toggle("d-none"));
+        document.querySelectorAll(".songlist-mode-add").forEach(item=>item.classList.toggle("d-none"));
+    }
+
     function filterSongs() {
-        const nummap = { '1': "^\n", '2': "2aábcč", '3': "3dďeéf", '4': "4ghií", '5': "5jkl", '6': "6mnňoó", '7': "7pqrřsš", '8': "8tťuúův", '9': "9wxyýzž", '0': "0 " }
+        const nummap = {
+            '1': "^\n",
+            '2': "2aábcč",
+            '3': "3dďeéf",
+            '4': "4ghií",
+            '5': "5jkl",
+            '6': "6mnňoó",
+            '7': "7pqrřsš",
+            '8': "8tťuúův",
+            '9': "9wxyýzž",
+            '0': "0 ",
+        };
         const filterInput = document.getElementById('song-filter').value;
 
         let res = ""

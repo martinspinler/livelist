@@ -9,7 +9,6 @@ together with moving anchor with every add.
 TODO: retain anchor when update_playlist (it moves anchor at end)
 
 TODO: handle playlist name/date update in nav/header
-TODO: fix/clear selection after one delete
 */
 
 function initApplication() {
@@ -78,6 +77,16 @@ function initApplication() {
 
                 list_e.appendChild(item_e);
                 last_e = item_e;
+
+            }
+        );
+
+        let ids = msg.items.map(x => x.id);
+        state.selection.forEach(
+            item => {
+                if (ids.indexOf(item) < 0) {
+                    state.selection.splice(state.selection.indexOf(item), 1);
+                }
             }
         );
 

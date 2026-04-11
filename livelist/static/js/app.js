@@ -94,6 +94,7 @@ function initApplication() {
             livelist_item_set_current(last_e);
         }
 
+        livelist_update_item_numbers();
         livelist_update_playing_item(msg.active_item_id);
         songlist_update_used_items(msg.items);
         update_edit_mode();
@@ -164,11 +165,12 @@ function initApplication() {
             }
         }
 
-        state.songlist = new Map(msg.map(s => Array(s.id, s)));
+        state.songlist = new Map(msg.items.map(s => Array(s.id, s)));
+        state.tags = msg.tags;
 
         ["NOT"].forEach(item => add_tag(item));
 
-        msg.forEach(
+        msg.items.forEach(
             item => {
                 const tmpl = document.getElementById("songlist-item-template").content.cloneNode(true);
                 const pi = tmpl.querySelector('.songlist-item');
@@ -185,11 +187,9 @@ function initApplication() {
 
                 item.tags.forEach(
                     tag => {
-                        const tag_tmpl = document.getElementById("songlist-tag-template").content.cloneNode(true);
-                        const tag_item = tag_tmpl.querySelector('.songlist-item-tag');
+                        const tag_tmpl = document.getElementById("tagfilter-template").content.cloneNode(true);
+                        const tag_item = tag_tmpl.querySelector('.tag-filter-item');
                         tag_item.textContent = tag;
-                        /*tag_item.querySelector('.songlist-item-tag').textContent =
-                        (item.tags ? item.tags.join(', ') : '');*/
                         pi.querySelector('.songlist-item-tags').appendChild(tag_item);
                         add_tag(tag);
                     }

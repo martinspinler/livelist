@@ -495,21 +495,25 @@ def get_songs(data):
 
     songs = db.session.query(Song).filter_by(band_id=band.id).order_by(Song.name).all()
 
-    res = [
-        {
-            "id": s.id,
-            #"uuid": s.uuid,
-            "name": s.name,
-            "user_id": s.user_id,
-            "bpm": s.bpm,
-            "notes": s.notes,
-            "filename": s.filename,
-            "store": s.store,
-            #"meta": json.loads(s.meta) if s.meta else None,
-            "tags": [tag.name for tag in s.tags],
-        }
-        for s in songs
-    ]
+    res = {
+        "tags": [
+        ],
+        "items": [
+            {
+                "id": s.id,
+                #"uuid": s.uuid,
+                "name": s.name,
+                "user_id": s.user_id,
+                "bpm": s.bpm,
+                "notes": s.notes,
+                "filename": s.filename,
+                "store": s.store,
+                #"meta": json.loads(s.meta) if s.meta else None,
+                "tags": [tag.name for tag in s.tags],
+            }
+            for s in songs
+        ],
+    }
 
     emit("songlist", res)
 

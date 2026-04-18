@@ -44,6 +44,7 @@ class Band(Base):
     )
 
     songs: Mapped[List["Song"]] = relationship("Song", back_populates="band")
+    tags: Mapped[List["Tag"]] = relationship("Tag", back_populates="band")
 
 
 class Playlist(Base):
@@ -114,6 +115,8 @@ class Tag(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(50), unique=True)
+    band_id: Mapped[int] = mapped_column(ForeignKey("bands.id"))
+    band: Mapped["Band"] = relationship("Band", back_populates="tags")
     color: Mapped[Optional[str]] = mapped_column(String(7))  # Hex color for UI display
     songs: Mapped[List["Song"]] = relationship("Song", secondary=song_tags, back_populates="tags")
 

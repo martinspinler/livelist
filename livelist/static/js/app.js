@@ -7,8 +7,9 @@ Current alternative is anchor inside header-item
 as BEGIN-item and adding AFTER anchor (of course anchor is livelist-item as well),
 together with moving anchor with every add.
 TODO: retain anchor when update_playlist (it moves anchor at end)
-
+TODO: retain songlist filter after songlist update
 TODO: handle playlist name/date update in nav/header
+TODO: after delete last, turn off livelist edit mode
 */
 
 function initApplication() {
@@ -168,6 +169,8 @@ function initApplication() {
         state.songlist = new Map(msg.items.map(s => Array(s.id, s)));
         state.tags = msg.tags;
 
+        tag_filter.innerHTML = "";
+
         ["NOT"].forEach(item => add_tag(item));
 
         msg.items.forEach(
@@ -198,6 +201,9 @@ function initApplication() {
                 document.getElementById('song-list').appendChild(pi);
             }
         );
+
+        edit_song_update_tags(state.songlist.get(state.edit_song_id));
+        update_songlist_panel_edit();
     }
 
     /* Playlist */
@@ -298,8 +304,13 @@ function initApplication() {
         document.getElementById('save-song-changes').addEventListener('click', song_save);
         document.getElementById('edit-sort').addEventListener('click', editSort);
         document.getElementById('songlist-panel-pin').addEventListener('click', handle_songlist_panel_pin);
-        document.getElementById('songlist-panel-edit').addEventListener('click', handle_songlist_panel_edit);
+        document.getElementById('songlist-panel-edit').addEventListener('click', (e) => {
+            state.songitemEditMode = !state.songitemEditMode;
+            update_songlist_panel_edit();
+        });
+
         document.getElementById('livelist-delete-selected').addEventListener('click', handle_livelist_delete_selected);
+        document.getElementById('edit-song-tag-create').addEventListener('click', handle_editsong_tag_create);
 
         function handle_tag_filter_btn(ev) {
             document.getElementById('tag-filter').classList.toggle('d-none');
@@ -380,14 +391,20 @@ function initApplication() {
             return true;
         }
 
+        function handle_editsong_tag_create(ev) {
+            const tagName = document.getElementById("edit-song-tag").value;
+            state.socket.emit("create_tag", {name: tagName});
+        }
+
         // Playlist item actions
-        document.addEventListener("click", (event) => {
-            const target = event.target;
+        document.addEventListener("click", (e) => {
+            const target = e.target;
 
             const livelist_item = target.closest(".livelist-item");
             const songlist_item = target.closest(".songlist-item");
             const playlist_item = target.closest(".playlist-item");
             const tag_filter_item = target.closest(".tag-filter-item");
+            const songlist_item_tag = target.closest(".songlist-item-tag");
 
             if (livelist_item) {
                 handle_livelist_item_click(target, livelist_item, parseInt(livelist_item.dataset.itemId));
@@ -396,18 +413,30 @@ function initApplication() {
             } else if (playlist_item) {
                 const ret = handle_playlist_item_click(target, playlist_item, parseInt(playlist_item.dataset.playlistId));
                 if (ret) {
-                    event.stopPropagation();
+                    e.stopPropagation();
                 }
+            } else if (songlist_item_tag) {
+                const song = state.songlist.get(state.edit_song_id);
+                songlist_item_tag.classList.toggle("btn-outline-primary");
+                songlist_item_tag.classList.toggle("btn-primary");
+                if (songlist_item_tag.classList.contains("btn-outline-primary")) {
+                    song.tags.splice(song.tags.indexOf(songlist_item_tag.dataset.name), 1);
+                } else {
+                    song.tags.push(songlist_item_tag.dataset.name);
+                }
+                song_save();
             } else if (tag_filter_item) {
                 if (tag_filter_item.textContent == "NOT") {
                     tag_filter_item.classList.toggle("btn-outline-primary");
                     tag_filter_item.classList.toggle("btn-primary");
                 } else {
                     const tag_filter_list = tag_filter_item.closest('#tag-filter-list');
+                    const tag_not = tag_filter_list.querySelector('button[data-tag-type="NOT"]');
                     if (tag_filter_item.classList.contains("btn-outline-primary")) {
-                        if (tag_filter_list.querySelector('button[data-tag-type="NOT"]').classList.contains("btn-primary")) {
+                        if (tag_not.classList.contains("btn-primary")) {
                             tag_filter_item.classList.toggle("btn-outline-primary");
                             tag_filter_item.classList.toggle("btn-danger");
+
                         } else {
                             tag_filter_item.classList.toggle("btn-outline-primary");
                             tag_filter_item.classList.toggle("btn-success");
@@ -417,6 +446,8 @@ function initApplication() {
                         tag_filter_item.classList.toggle("btn-success", false);
                         tag_filter_item.classList.toggle("btn-danger", false);
                     }
+                    tag_not.classList.toggle("btn-primary", false);
+                    tag_not.classList.toggle("btn-outline-primary", true);
 
                     /*
                     const tag_filter_active = document.getElementById('tag-filter-active');
@@ -442,7 +473,7 @@ function initApplication() {
                     }
                 )
                 navigator.clipboard.writeText(str);
-                event.stopPropagation();
+                e.stopPropagation();
             } else if (target.closest("#livelist-header")) {
                 livelist_item_set_current(null);
             }
@@ -514,29 +545,42 @@ function initApplication() {
     }
 
     function editSong(id) {
+        state.edit_song_id = id;
         const song = state.songlist.get(id);
         document.getElementById('edit-song-id').value = song.id;
         document.getElementById('edit-song-name').value = song.name;
         document.getElementById('edit-song-bpm').value = song.bpm;
+        edit_song_update_tags(song);
+    }
 
+    function edit_song_update_tags(song) {
         const tagedit = document.getElementById('edit-song-tags');
-		tagedit.textContent = "";
+        /* INFO: song can be null */
+        tagedit.textContent = "";
         state.tags.forEach(
             item => {
                 const tag_tmpl = document.getElementById("songlist-tag-template").content.cloneNode(true);
                 const tag_item = tag_tmpl.querySelector('.songlist-item-tag');
                 tag_item.textContent = item;
+                tag_item.dataset.name = item;
+                if (song != null && song.tags.indexOf(item) >= 0) {
+                    tag_item.classList.toggle("btn-primary");
+                    tag_item.classList.toggle("btn-outline-primary");
+                }
                 tagedit.appendChild(tag_item);
             }
         );
     }
 
     function song_save() {
+        const id = parseInt(document.getElementById('edit-song-id').value);
         const data = {
-            id: parseInt(document.getElementById('edit-song-id').value),
+            id: id,
             name: document.getElementById('edit-song-name').value,
             bpm: document.getElementById('edit-song-bpm').value,
+            tags: state.songlist.get(id).tags,
         }
+
         state.socket.emit("save_song", data);
     }
 
@@ -581,11 +625,13 @@ function initApplication() {
         e.target.classList.toggle("bi-pin");
     }
 
-    function handle_songlist_panel_edit(e) {
-        e.target.classList.toggle("btn-outline-primary");
-        e.target.classList.toggle("btn-primary");
-        document.querySelectorAll(".songlist-mode-edit").forEach(item=>item.classList.toggle("d-none"));
-        document.querySelectorAll(".songlist-mode-add").forEach(item=>item.classList.toggle("d-none"));
+    function update_songlist_panel_edit() {
+        const mode = state.songitemEditMode;
+        const edit = document.getElementById("songlist-panel-edit");
+        edit.classList.toggle("btn-outline-primary", !mode);
+        edit.classList.toggle("btn-primary", mode);
+        document.querySelectorAll(".songlist-mode-edit").forEach(item => item.classList.toggle("d-none", !mode));
+        document.querySelectorAll(".songlist-mode-add").forEach(item => item.classList.toggle("d-none", mode));
     }
 
     function filterSongs() {

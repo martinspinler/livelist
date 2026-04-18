@@ -52,7 +52,7 @@
 
 
 <template id="songlist-tag-template">
-    <small class="songlist-item-tag badge text-bg-info text-muted gap-1"></small>
+    <small class="songlist-item-tag badge btn btn-sm btn-outline-primary text-muted gap-1 tag-item"></small>
 </template>
 
 
@@ -81,7 +81,7 @@
     <div class="container-fluid mt-2">
         <div id="nav-main">
             <button class="btn btn-outline-primary bi bi-plus mx-lg-2" data-bs-toggle="offcanvas"
-                    data-bs-target="#songlist-panel">Add Song</button>
+                    data-bs-target="#songlist-panel" id="btn-songlist-panel">Add Song</button>
             <button class="btn btn-outline-primary bi bi-list-ul mx-lg-2" data-bs-toggle="offcanvas"
                     data-bs-target="#playlist-panel">Playlists</button>
             <a class="btn btn-outline-primary bi bi-file-play mx-lg-2" href="{{ url_for('views.play_view', playlist_id=playlist.id) if playlist else '#' }}"
@@ -300,6 +300,9 @@
         currentItem: null,
         activeItem: null,
         activePlaylist: null,
+
+        edit_song_id: null,
+        songitemEditMode: false,
 
         playlist: null,
         songlist: [],

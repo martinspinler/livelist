@@ -11,7 +11,7 @@ from sqlalchemy import and_
 from .config import load_config
 
 from .config.settings import Config
-from .models import Band, Song, Playlist, PlaylistItem, db
+from .models import Band, Song, Playlist, PlaylistItem, Tag, db
 from .routes import api_bp, auth_bp, views_bp
 from .routes.views import get_privileges
 
@@ -327,6 +327,7 @@ def handle_play_item(data: Dict):
                 to=f"band_{band.id}",
             )
 
+
 @socketio.on("add_song")
 def add_playlist_item(data):
     """Add a song to a playlist"""
@@ -494,9 +495,11 @@ def get_songs(data):
     band = get_current_band()
 
     songs = db.session.query(Song).filter_by(band_id=band.id).order_by(Song.name).all()
+    tags = db.session.query(Tag).filter_by(band_id=band.id).all()#.order_by(Song.name).all()
 
     res = {
         "tags": [
+            t.name for t in tags
         ],
         "items": [
             {
@@ -516,6 +519,54 @@ def get_songs(data):
     }
 
     emit("songlist", res)
+
+
+@socketio.on("create_tag")
+def create_tag(data):
+    """Create a new tag"""
+
+    band = get_current_band()
+    if not band:
+        return
+
+    name = data.get("name")
+
+    tag = Tag(band_id=band.id, name=name)
+
+    db.session.add(tag)
+    db.session.commit()
+
+    get_songs({})
+
+
+@socketio.on("save_song")
+def save_song(data):
+    """Create a new tag"""
+
+    band = get_current_band()
+    if not band:
+        return
+
+    song = db.session.get_one(Song, data["id"])
+    name = data.get("name")
+    # TODO: Check filter used TAG ID's for band_id!
+
+    tags = db.session.query(Tag).filter_by(band_id=band.id).all()#.order_by(Song.name).all()
+    for t in tags:
+        if t.name not in data.get("tags", []):
+            if t in song.tags:
+                song.tags.remove(t)
+        else:
+            if t not in song.tags:
+                song.tags.append(t)
+
+    song.name = data.get("name", song.name)
+    song.bpm = data.get("bpm", song.bpm)
+
+    db.session.add(song)
+    db.session.commit()
+
+    get_songs({})
 
 
 # Error handlers

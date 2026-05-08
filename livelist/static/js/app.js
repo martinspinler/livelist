@@ -14,7 +14,34 @@ TODO: after delete last, turn off livelist edit mode
 
 function initApplication() {
     const socket = state.io(window.Location.host, state.socket_auth);
-    state.socket = socket;
+
+	Object.assign(state, {
+        editMode: false,
+        selectedItems: new Set(),
+        socket: socket,
+
+        selectionMode: "none",
+        selection: new Array(),
+
+        //currentBand: null,
+        //currentPlaylist: null,
+        currentItem: null,
+        activeItem: null,
+        //activePlaylist: null,
+
+        edit_song_id: null,
+        songitemEditMode: false,
+
+        playlist: null,
+        songlist: [],
+        usedSongs: [],
+        /*socket_auth: {
+            auth: {
+                band: null,
+                key: null,
+            },
+        },*/
+	});
 
     setupEventListeners();
     setupSocketCallbacks();

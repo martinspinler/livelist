@@ -288,33 +288,7 @@
 <script>
     var state = {
         io: io,
-        editMode: false,
-        selectedItems: new Set(),
-        socket: null,
-
-        selectionMode: "none",
-        selection: new Array(),
-
-        currentBand: null,
-        currentPlaylist: null,
-        currentItem: null,
-        activeItem: null,
-        activePlaylist: null,
-
-        edit_song_id: null,
-        songitemEditMode: false,
-
-        playlist: null,
-        songlist: [],
-        usedSongs: [],
-        socket_auth: {
-            auth: {
-                band: null,
-                key: null,
-            },
-        },
     };
-
     jinja_update(state);
     initApplication();
 </script>

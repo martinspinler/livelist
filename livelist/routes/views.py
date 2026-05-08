@@ -11,6 +11,16 @@ from . import views_bp
 
 
 def get_privileges(band_name, key):
+    band = (
+        db.session.query(Band)
+        .filter_by(addr=band_name)
+        .first()
+    )
+    if band:
+        if key == band.pwd:
+            return "edit"
+    return None
+
     all_bands = current_app.config["BANDS_CONFIG"]
     if band_name in all_bands:
         access_key = all_bands[band_name]["access"]["edit"]["password"]

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-
+import click
 from datetime import datetime
 from typing import Dict, Optional
 
@@ -588,6 +588,20 @@ def init_db_command():
     with app.app_context():
         db.create_all()
         print("Database initialized.")
+
+
+@app.cli.command("create-band")
+@click.argument("name")
+@click.argument("addr")
+@click.argument("password")
+def create_band(name, addr, password):
+    """Create a new band"""
+    with app.app_context():
+        db.create_all()
+        band = Band(name=name, addr=addr, pwd=password)
+        db.session.add(band)
+        db.session.commit()
+        print("Band created.")
 
 
 if __name__ == "__main__":

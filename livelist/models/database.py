@@ -31,6 +31,7 @@ class Band(Base):
     # Authentication tokens
     #view_token: Mapped[Optional[str]] = mapped_column(String(255))
     #edit_token: Mapped[Optional[str]] = mapped_column(String(255))
+    pwd: Mapped[Optional[str]] = mapped_column(String(255))
 
     # Active playlist (will be set by application, no foreign key to avoid circular dependency)
     active_playlist_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)

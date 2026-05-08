@@ -291,9 +291,10 @@ function initApplication() {
             btn.addEventListener('click', handleKeypadButton);
         });
 
-        document.getElementById('toggle-keypad').addEventListener('click', () => {
+        document.getElementById('songlist-toggle-keypad').addEventListener('click', () => {
             document.getElementById('keypad-container').classList.toggle('d-none');
         });
+        document.getElementById('songlist-song-create').addEventListener('click', handle_songlist_create_song);
 
         document.getElementById('song-filter').addEventListener('input', debounce(filterSongs, 200));
         document.getElementById('sort-alpha').addEventListener('click', () => sortSongs('alpha'));
@@ -396,6 +397,11 @@ function initApplication() {
         function handle_editsong_tag_create(ev) {
             const tagName = document.getElementById("edit-song-tag").value;
             state.socket.emit("create_tag", {name: tagName});
+        }
+
+        function handle_songlist_create_song(ev) {
+            const name = document.getElementById("song-filter").value;
+            state.socket.emit("create_song", {name: name});
         }
 
         // Playlist item actions

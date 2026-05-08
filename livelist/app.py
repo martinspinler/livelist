@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import click
+import json
 from datetime import datetime
 from typing import Dict, Optional
 
@@ -513,7 +514,7 @@ def get_songs(data):
                 "notes": s.notes,
                 "filename": s.filename,
                 "store": s.store,
-                #"meta": json.loads(s.meta) if s.meta else None,
+                "meta": json.loads(s.meta) if s.meta else None,
                 "tags": [tag.name for tag in s.tags],
             }
             for s in songs
@@ -571,6 +572,36 @@ def save_song(data):
     get_songs({})
 
 
+@socketio.on("create_song")
+def create_song(data):
+    band = get_current_band()
+    if not band:
+        return
+
+    song = Song(
+        band_id=band.id,
+        name=data.get("name"),
+        user_id=data.get("user_id"),
+        bpm=data.get("bpm"),
+        #notes=data.get("notes"),
+        #store=data.get("store"),
+        meta=json.dumps(data.get("meta")) if data.get("meta") is not None else None,
+    )
+
+    db.session.add(song)
+    db.session.commit()
+
+    get_songs({})
+
+
+@socketio.on("batch")
+def batch(data):
+    req_cnt = 0
+    for req in data.get('requests', []):
+        cmd = req.get("cmd")
+        arg = req.get("arg")
+        if cmd == "create_song":
+            create_song(arg)
 # Error handlers
 @app.errorhandler(404)
 def not_found_error(error):
@@ -606,7 +637,7 @@ def create_band(name, addr, password):
         print("Band created.")
 
 
-if __name__ == "__main__":
+def create_app():
     # Create database tables if they don't exist
     with app.app_context():
         db.create_all()
@@ -619,3 +650,6 @@ if __name__ == "__main__":
         debug=app.config.get("DEBUG", True),
         allow_unsafe_werkzeug=True,
     )
+
+if __name__ == "__main__":
+    create_app()

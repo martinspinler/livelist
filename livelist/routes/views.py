@@ -21,12 +21,6 @@ def get_privileges(band_name, key):
             return "edit"
     return None
 
-    all_bands = current_app.config["BANDS_CONFIG"]
-    if band_name in all_bands:
-        access_key = all_bands[band_name]["access"]["edit"]["password"]
-        if access_key == key:
-            return "edit"
-    return None
 
 def check_privileges(band):
     auth_cookie = flask.json.loads(request.cookies.get('auth_data_simple', "{}"))
@@ -34,6 +28,7 @@ def check_privileges(band):
         if band == band_name and get_privileges(band_name, key):
             return key
     return None
+
 
 @views_bp.route("/")
 def index():

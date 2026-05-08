@@ -23,7 +23,9 @@ function initApplication() {
     window.addEventListener("DOMContentLoaded", function () {
         socket.emit("get_songlist", {});
         socket.emit("get_playlists", {});
-        socket.emit("select_playlist", { playlist_id: state.currentPlaylist });
+        if (state.currentPlaylist != null) {
+            socket.emit("select_playlist", { playlist_id: state.currentPlaylist });
+        }
     });
 
     function handle_drag_and_drop(msg) {

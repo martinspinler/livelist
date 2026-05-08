@@ -149,6 +149,8 @@ def validate_token(band_id: int, token: str, required_permission: str = "view") 
 
 def get_playlist_items(band, data):
     playlist_id = data.get("playlist_id")
+    if playlist_id is None:
+        return {}
 
     playlist = db.session.get_one(Playlist, playlist_id)
     items = (
@@ -189,7 +191,7 @@ clients = {}
 @socketio.on("connect")
 def handle_connect(auth):
     """Handle WebSocket connection"""
-    print("Connected WS", request, auth)
+    #print("Connected WS", request, auth)
     if get_privileges(auth["band"], auth["key"]) is None:
         return False
 

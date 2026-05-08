@@ -192,7 +192,7 @@ clients = {}
 def handle_connect(auth):
     """Handle WebSocket connection"""
     #print("Connected WS", request, auth)
-    if get_privileges(auth["band"], auth["key"]) is None:
+    if auth is None or get_privileges(auth.get("band"), auth.get("key")) is None:
         return False
 
     band = db.session.query(Band).filter_by(addr=auth["band"]).first()

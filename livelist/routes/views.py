@@ -28,10 +28,10 @@ def get_privileges(band_name, key):
             return "edit"
     return None
 
-def check_privileges():
+def check_privileges(band):
     auth_cookie = flask.json.loads(request.cookies.get('auth_data_simple', "{}"))
     for band_name, key in auth_cookie.items():
-        if get_privileges(band_name, key):
+        if band == band_name and get_privileges(band_name, key):
             return key
     return None
 
@@ -89,7 +89,7 @@ def view_band(band):
 def view_band_noredirect(band):
     """Main playlist interface"""
     # Get band from subdomain or default
-    key = check_privileges()
+    key = check_privileges(band)
     if key is None:
         return make_response(redirect('/?auth_failed'))
 

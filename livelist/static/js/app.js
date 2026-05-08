@@ -1,14 +1,9 @@
 "use strict";
 
-/* TODO: Virtual livelist END-item, which can be selected (but not played) and
-the new items, or the multi-moved (sorted) items, will be added BEFORE this item.
-This item will be grayed but visible always?
-Current alternative is anchor inside header-item
-as BEGIN-item and adding AFTER anchor (of course anchor is livelist-item as well),
-together with moving anchor with every add.
-TODO: retain anchor when update_playlist (it moves anchor at end)
+/*
 TODO: retain songlist filter after songlist update
 TODO: handle playlist name/date update in nav/header
+TODO: update song name in all clients after one changes
 TODO: after delete last, turn off livelist edit mode
 */
 
@@ -25,9 +20,11 @@ function initApplication() {
 
         //currentBand: null,
         //currentPlaylist: null,
-        currentItem: null,
         activeItem: null,
         //activePlaylist: null,
+        anchorItem: null,
+        anchorItemSticky: false,
+        lastAction: null,
 
         edit_song_id: null,
         songitemEditMode: false,
@@ -89,10 +86,11 @@ function initApplication() {
         document.getElementById("livelist-date").textContent = msg.date;
 
         const list_e = document.getElementById('livelist-items')
-        let last_e = null;
+        const prevAnchor = state.anchorItem;
+
         list_e.innerHTML = "";
         msg.items.forEach(
-                item => {
+            item => {
                 /* TODO: 'Break' item should create <div class="card-header">*/
                 const tmpl = document.getElementById("livelist-item-template").content.cloneNode(true);
                 const item_e = tmpl.querySelector('.livelist-item');
@@ -103,11 +101,12 @@ function initApplication() {
                 item_e.querySelector('.song-user_id').textContent =
                     (item.song.user_id ? item.song.user_id + ' - ' : '') + (item.song.notes || '');
                 item_e.querySelector('.livelist-item-position').textContent = item.position + 1;
-                //item_e.classList.toggle("active", item.id == state.currentItem);
 
                 list_e.appendChild(item_e);
-                last_e = item_e;
 
+                if (prevAnchor != null && item.id == prevAnchor.dataset.itemId) {
+                    state.anchorItem = item_e;
+                }
             }
         );
 
@@ -120,9 +119,18 @@ function initApplication() {
             }
         );
 
-        if (last_e) {
-            livelist_item_set_current(last_e);
+        let ai = state.anchorItem;
+        if (state.lastAction == "add_song") {
+            if (!state.anchorItemSticky) {
+                if (ai == null) {
+                    ai = document.querySelectorAll('.livelist-item')[0];
+                } else {
+                    ai = ai.nextSibling;
+                }
+            }
+            state.lastAction = null;
         }
+        livelist_item_set_anchor(ai);
 
         livelist_update_item_numbers();
         livelist_update_playing_item(msg.active_item_id);
@@ -142,16 +150,26 @@ function initApplication() {
         );
     }
 
-    function livelist_item_set_current(pi) {
-        if (state.currentItem) {
-            state.currentItem.querySelector(".livelist-item-anchor").classList.add("d-none");
+    function livelist_item_set_anchor(pi, user_action=false) {
+        if (state.anchorItem) {
+            state.anchorItem.querySelector(".livelist-item-anchor").classList.add("d-none");
         }
-        state.currentItem = pi;
-        if (pi == null) {
-            document.getElementById("livelist-header-anchor").classList.remove("d-none");
+        if (pi == state.anchorItem && user_action) {
+            state.anchorItemSticky = !state.anchorItemSticky;
+        }
+
+        let ai_el;
+        state.anchorItem = pi;
+        if (state.anchorItem == null) {
+            ai_el = document.getElementById("livelist-header-anchor");
+            ai_el.classList.remove("d-none");
         } else {
             document.getElementById("livelist-header-anchor").classList.add("d-none");
-            pi.querySelector(".livelist-item-anchor").classList.remove("d-none");
+            ai_el = pi.querySelector(".livelist-item-anchor");
+            ai_el.classList.remove("d-none");
+        }
+        if (ai_el != null) {
+            ai_el.classList.toggle("btn-outline-primary", state.anchorItemSticky);
         }
     }
 
@@ -240,12 +258,16 @@ function initApplication() {
         state.playlist = msg;
         state.currentPlaylist = msg.playlist_id;
         state.activeItem = msg.active_item_id;
-        state.currentItem = null;
+        state.anchorItem = null;
         state.usedSongs = msg.items.map(item => item.song_id);
 
         state.selection.length = 0;
 
         livelist_update(msg);
+
+        /* Select last item as anchor */
+        let li = document.querySelectorAll('.livelist-item');
+        livelist_item_set_anchor(li.item(li.length - 1));
 
         // Update the UI to show the selected playlist
         const playlistButtons = document.querySelectorAll(".playlist-btn-select");
@@ -369,13 +391,7 @@ function initApplication() {
 
         function handle_livelist_item_select(pi) {
             if (true || state.editMode == false) {
-                livelist_item_set_current(/*state.currentItem == pi ? null : */pi);
-                /* TODO: clean-up */
-                //pi.getElementById("livelist-header-anchor").classList.remove("d-none");
-                /*
-                document.getElementById("song-insert-after").toggleAttribute("disabled", state.currentItem == null);
-                document.getElementById("song-insert-before").toggleAttribute("disabled", state.currentItem == null);
-                 */
+                livelist_item_set_anchor(pi, true);
             }
         }
 
@@ -510,7 +526,7 @@ function initApplication() {
                 navigator.clipboard.writeText(str);
                 e.stopPropagation();
             } else if (target.closest("#livelist-header")) {
-                livelist_item_set_current(null);
+                livelist_item_set_anchor(null, true);
             }
         });
     }
@@ -620,12 +636,23 @@ function initApplication() {
     }
 
     function addSongToPlaylist(id) {
-        const data = { playlist_id: state.currentPlaylist, song_id: id };
-        if (state.currentItem/* && !document.getElementById('song-insert-end').checked*/) {
-            data.target_id = parseInt(state.currentItem.dataset.itemId);
-            //data.before = document.getElementById('song-insert-before').checked;
-            data.before = false;
+        const data = {
+            playlist_id: state.currentPlaylist,
+            song_id: id,
+            before: false,
+        };
+
+        let ai = state.anchorItem;
+        if (ai == null) {
+            let elms = document.querySelectorAll('.livelist-item');
+            ai = elms.length > 0 ? elms[0] : null;
+            data.before = true;
         }
+
+        if (ai != null) {
+            data.target_id = parseInt(ai.dataset.itemId);
+        }
+        state.lastAction = "add_song";
         state.socket.emit("add_song", data);
 
         if (document.getElementById('songlist-panel-pin').classList.contains("bi-pin")) {

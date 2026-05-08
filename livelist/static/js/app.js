@@ -15,7 +15,7 @@ TODO: after delete last, turn off livelist edit mode
 function initApplication() {
     const socket = state.io(window.Location.host, state.socket_auth);
 
-	Object.assign(state, {
+    Object.assign(state, {
         editMode: false,
         selectedItems: new Set(),
         socket: socket,
@@ -41,7 +41,7 @@ function initApplication() {
                 key: null,
             },
         },*/
-	});
+    });
 
     setupEventListeners();
     setupSocketCallbacks();

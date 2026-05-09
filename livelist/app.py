@@ -7,7 +7,7 @@ from typing import Dict, Optional
 from flask import Flask, render_template, request, session
 from flask_socketio import SocketIO, emit, join_room, leave_room
 
-from sqlalchemy import and_
+from sqlalchemy import and_, desc
 
 from .config import load_config
 
@@ -314,22 +314,45 @@ def handle_play_item(data: Dict):
 
     # Update active item in playlist
     playlist = db.session.query(Playlist).get(playlist_id)
-    if playlist and playlist.band_id == band.id:
-        item = db.session.query(PlaylistItem).get(item_id)
-        if item and item.playlist_id == playlist_id:
-            playlist.active_item_id = item_id
-            db.session.commit()
+    if playlist is None or playlist.band_id != band.id:
+        return
 
-            # Broadcast play event
-            emit(
-                "item_played",
-                {
-                    "playlist_id": playlist_id,
-                    "item_id": item_id,
-                    "timestamp": datetime.utcnow().isoformat(),
-                },
-                to=f"band_{band.id}",
-            )
+    # Relative position
+    if item_id is None:
+        item_id = playlist.active_item_id
+        off = data.get("off")
+        if off is None:
+            return
+
+        if item_id is None:
+            litem = db.session.query(PlaylistItem).filter_by(playlist_id=playlist_id).order_by(desc(PlaylistItem.position)).first()
+            if litem is not None and off < 0:
+                pos = litem.position
+            else:
+                pos = 0
+        else:
+            act_item = db.session.query(PlaylistItem).get(item_id)
+            pos = act_item.position + off
+        item = db.session.query(PlaylistItem).filter_by(playlist_id=playlist_id, position=pos).first()
+        item_id = None if item is None else item.id
+
+    item = db.session.query(PlaylistItem).get(item_id)
+    if item and item.playlist_id != playlist_id:
+        return
+
+    playlist.active_item_id = item_id
+    db.session.commit()
+
+    # Broadcast play event
+    emit(
+        "item_played",
+        {
+            "playlist_id": playlist_id,
+            "item_id": item_id,
+            "timestamp": datetime.utcnow().isoformat(),
+        },
+        to=f"band_{band.id}",
+    )
 
 
 @socketio.on("add_song")

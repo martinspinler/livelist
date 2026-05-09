@@ -81,19 +81,7 @@ def view_band(band):
         return redirect(request.scheme + "://" + band + "." + request.host)
     return view_band_noredirect(band)
 
-def view_band_noredirect(band):
-    """Main playlist interface"""
-    # Get band from subdomain or default
-    key = check_privileges(band)
-    if key is None:
-        return make_response(redirect('/?auth_failed'))
-
-    band = _get_current_band(band)
-    if band is None:
-        return make_response(redirect('/?auth_failed'))
-        return render_template("404.html")
-        return redirect(url_for("views.band_selection"))
-
+def get_default_playlist(band):
     # Get active playlist
     playlist = None
     if band.active_playlist_id:
@@ -107,6 +95,22 @@ def view_band_noredirect(band):
             .order_by(Playlist.date.desc())
             .first()
         )
+    return playlist
+
+def view_band_noredirect(band):
+    """Main playlist interface"""
+    # Get band from subdomain or default
+    key = check_privileges(band)
+    if key is None:
+        return make_response(redirect('/?auth_failed'))
+
+    band = _get_current_band(band)
+    if band is None:
+        return make_response(redirect('/?auth_failed'))
+        return render_template("404.html")
+        return redirect(url_for("views.band_selection"))
+
+    playlist = get_default_playlist(band)
 
     date_today = date.today().isoformat()
     jinja_script = f"""<script>

@@ -14,7 +14,7 @@ from .config import load_config
 from .config.settings import Config
 from .models import Band, Song, Playlist, PlaylistItem, Tag, db
 from .routes import api_bp, auth_bp, views_bp
-from .routes.views import get_privileges
+from .routes.views import get_privileges, get_default_playlist
 
 
 # TODO: TAGS, edit song, create song
@@ -151,12 +151,13 @@ def validate_token(band_id: int, token: str, required_permission: str = "view") 
 def get_playlist_items(band, data):
     playlist_id = data.get("playlist_id")
     if playlist_id is None:
-        return {}
+        playlist = get_default_playlist(band)
+    else:
+        playlist = db.session.get_one(Playlist, playlist_id)
 
-    playlist = db.session.get_one(Playlist, playlist_id)
     items = (
         db.session.query(PlaylistItem)
-        .filter_by(playlist_id=playlist_id)
+        .filter_by(playlist_id=playlist.id)
         .order_by(PlaylistItem.position)
         .all()
     )

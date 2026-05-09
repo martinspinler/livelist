@@ -589,6 +589,11 @@ def save_song(data):
 
     song.name = data.get("name", song.name)
     song.bpm = data.get("bpm", song.bpm)
+    if data.get("meta") is not None:
+        try:
+            song.meta = json.dumps(data.get("meta"))
+        except Exception:
+            pass
 
     db.session.add(song)
     db.session.commit()

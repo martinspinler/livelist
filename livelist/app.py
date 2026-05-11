@@ -427,6 +427,8 @@ def on_move(data):
 @socketio.on("delete_items")
 def on_delete_item(data):
     playlist_id = data.get("playlist_id")
+    playlist = db.session.get_one(Playlist, playlist_id)
+
     items = (
         db.session.query(PlaylistItem)
         .filter(and_(
@@ -438,6 +440,9 @@ def on_delete_item(data):
 
     for item in items:
         db.session.delete(item)
+        if item.id == playlist.active_item_id:
+            playlist.active_item_id = None
+            db.session.add(playlist)
     db.session.commit()
 
     items = (

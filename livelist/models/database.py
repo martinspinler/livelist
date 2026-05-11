@@ -3,7 +3,7 @@ Database models for Livelist
 """
 
 import uuid
-from datetime import date
+from datetime import date as datetimedate
 from typing import Optional, List
 from sqlalchemy import ForeignKey, Index, String, Text, Integer, Date, Boolean, Table, Column
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -54,7 +54,7 @@ class Playlist(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     #uuid: Mapped[str] = mapped_column(String(36), default=lambda: str(uuid.uuid4()), unique=True)
     name: Mapped[str] = mapped_column(String(255))
-    date: Mapped[date] = mapped_column(Date)
+    date: Mapped[datetimedate] = mapped_column(Date)
 
     # Band association
     band_id: Mapped[int] = mapped_column(ForeignKey("bands.id"))

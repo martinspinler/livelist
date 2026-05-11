@@ -3,3 +3,4 @@ livelist/static/js/*bootstrap*
 livelist/static/js/*socket*
 livelist/static/css/*bootstrap*
 livelist/static/css/fonts/*
+**/__pycache__

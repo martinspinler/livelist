@@ -30,8 +30,10 @@ function initApplication() {
         songitemEditMode: false,
 
         playlist: null,
-        songlist: [],
+        songlist: new Map(),
         usedSongs: [],
+        songlistFetched: false,
+        playlistsFetched: false,
         /*socket_auth: {
             auth: {
                 band: null,
@@ -46,10 +48,8 @@ function initApplication() {
 
     window.addEventListener("DOMContentLoaded", function () {
         socket.emit("get_songlist", {});
-        socket.emit("get_playlists", {});
-        if (state.currentPlaylist != null) {
-            socket.emit("select_playlist", { playlist_id: state.currentPlaylist });
-        }
+        /* HOTFIX(synchronization): should emit "get_playlists" and "select_playlist",
+         * but it has issues. Maybe try async requests */
     });
 
     function handle_drag_and_drop(msg) {
@@ -251,6 +251,12 @@ function initApplication() {
 
         edit_song_update_tags(state.songlist.get(state.edit_song_id));
         update_songlist_panel_edit();
+
+        /* HOTFIX(synchronization) */
+        if (state.songlistFetched == false) {
+            state.songlistFetched = true;
+            socket.emit("get_playlists", {});
+        }
     }
 
     /* Playlist */
@@ -312,6 +318,15 @@ function initApplication() {
                 document.getElementById('playlist-items').appendChild(pi);
             }
         );
+
+        /* HOTFIX(synchronization) */
+        if (state.playlistsFetched == false) {
+            state.playlistsFetched = true;
+
+            if (state.currentPlaylist != null) {
+                socket.emit("select_playlist", { playlist_id: state.currentPlaylist });
+            }
+        }
     }
 
     function setupSocketCallbacks() {

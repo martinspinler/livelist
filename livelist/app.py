@@ -174,14 +174,14 @@ def get_playlist_items(band, data):
                 "song_id": item.song_id,
                 "position": item.position,
                 #"meta": json.loads(item.meta) if item.meta else None,
-                "song": {
-                    "id": item.song.id,
-                    "name": item.song.name,
-                    "user_id": item.song.user_id,
-                    "bpm": item.song.bpm,
-                    "notes": item.song.notes,
-                    "tags": [tag.name for tag in item.song.tags],
-                },
+                #"song": {
+                #    "id": item.song.id,
+                #    "name": item.song.name,
+                #    "user_id": item.song.user_id,
+                #    "bpm": item.song.bpm,
+                #    "notes": item.song.notes,
+                #    "tags": [tag.name for tag in item.song.tags],
+                #},
             } for item in items
         ],
     }

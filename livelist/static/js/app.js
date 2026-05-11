@@ -94,12 +94,14 @@ function initApplication() {
                 /* TODO: 'Break' item should create <div class="card-header">*/
                 const tmpl = document.getElementById("livelist-item-template").content.cloneNode(true);
                 const item_e = tmpl.querySelector('.livelist-item');
+                //const song = item.song;
+                const song = state.songlist.get(item.song_id)
                 item_e.dataset.itemId = item.id;
                 item_e.dataset.songId = item.song_id;
-                item_e.querySelector('.song-name').textContent = item.song.name;
-                item_e.querySelector('.song-tags').textContent = item.song.tags.join(",");
+                item_e.querySelector('.song-name').textContent = song.name;
+                item_e.querySelector('.song-tags').textContent = song.tags.join(",");
                 item_e.querySelector('.song-user_id').textContent =
-                    (item.song.user_id ? item.song.user_id + ' - ' : '') + (item.song.notes || '');
+                    (song.user_id ? song.user_id + ' - ' : '') + (song.notes || '');
                 item_e.querySelector('.livelist-item-position').textContent = item.position + 1;
 
                 list_e.appendChild(item_e);

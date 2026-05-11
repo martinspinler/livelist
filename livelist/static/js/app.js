@@ -837,7 +837,7 @@ function initApplication() {
 
     function editSort() {
         const data = {
-            moved_ids: state.selection.slice(1, 4),
+            moved_ids: state.selection.slice(1),
             target_id: state.selection[0],
             before: false,
             playlist_id: state.currentPlaylist,

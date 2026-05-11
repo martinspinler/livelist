@@ -581,7 +581,7 @@ function initApplication() {
         const toggleEditBtn = document.getElementById('toggle-edit');
         toggleEditBtn.textContent = state.editMode ? 'Done' : 'Edit';
         toggleEditBtn.classList.toggle('btn-outline-primary', !state.editMode);
-        toggleEditBtn.classList.toggle('btn-outline-success', state.editMode);
+        toggleEditBtn.classList.toggle('btn-success', state.editMode);
         document.getElementById('nav-main').classList.toggle("d-none", state.editMode);
         document.getElementById('nav-edit').classList.toggle("d-none", !state.editMode);
     }

@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 import click
 import json
-from datetime import datetime
+import datetime
+from datetime import datetime as dt
 from typing import Dict, Optional
 
 from flask import Flask, render_template, request, session
@@ -11,7 +12,7 @@ from sqlalchemy import and_, desc
 
 from .config.settings import Config
 from .models import Band, Song, Playlist, PlaylistItem, Tag, db
-from .routes import auth_bp, views_bp
+from .routes import views_bp
 from .routes.views import get_privileges, get_default_playlist
 
 
@@ -34,68 +35,17 @@ socketio = SocketIO(
 #    transports=["websocket"],
 )
 
-# Initialize sync manager
-#sync_manager = PlaylistSyncManager(server_id=str(uuid.uuid4()))
-
 # Register blueprints
 app.register_blueprint(views_bp)
-app.register_blueprint(auth_bp, url_prefix="/auth")
-
-
-# Authentication middleware
-@app.before_request
-def before_request():
-    """Check authentication and band access for each request"""
-    # Skip auth for static files and login
-    if request.endpoint in ("static", "auth.login", "auth.logout"):
-        return
-
-    # Get band from subdomain or URL
-    #band = get_current_band()
-    #if not band:
-    #    return redirect(url_for("views.band_selection"))
-
-    ## Check token for API endpoints
-    #if request.endpoint and request.endpoint.startswith("api."):
-    #    token = request.args.get("token") or request.headers.get("Authorization")
-    #    if not validate_token(band.id, token, required_permission="view"):
-    #        return jsonify({"error": "Unauthorized"}), 401
-
-    ## Store band in request context
-    #request.band = band
 
 
 def get_current_band() -> Band:
     """get current band based on subdomain or url parameter"""
 
-    return session.band
-    #return db.session.query(Band).get(clients[request.sid]['band'])
-    #return request.currentBand
-    #from flask import request
+    band = session.get("band")
+    assert isinstance(band, Band), "session has no band — not connected?"
+    return band
 
-    # try subdomain first
-    host = request.host
-    subdomain = host.split(".")[0] if "." in host else None
-
-    #if band_name is None:
-    #    # try url parameter
-    #    band_name = request.args.get("band") or request.view_args.get("band_name")
-
-
-    if subdomain:
-        band = db.session.query(Band).filter_by(addr=subdomain).first()
-        if band:
-            return band
-    raise Exception("Band not found")
-
-    #if band_name:
-    #    band = db.session.query(Band).filter_by(addr=band_name).first()
-    #    if band:
-    #        return band
-
-    # default to first band if none specified (for development)
-    return None
-    return db.session.query(Band).first()
 # Helper functions
 def xget_current_band() -> Optional[Band]:
     """Get current band based on subdomain or URL parameter"""
@@ -120,33 +70,14 @@ def xget_current_band() -> Optional[Band]:
             return band
 
     return None
-    # Default to first band if none specified (for development)
-    return db.session.query(Band).first()
-
-
-def validate_token(band_id: int, token: str, required_permission: str = "view") -> bool:
-    """Validate token for band access"""
-    return True
-
-    if not token:
-        return False
-
-    band = db.session.query(Band).get(band_id)
-    if not band:
-        return False
-
-    if required_permission == "view":
-        return token == band.view_token
-    elif required_permission == "edit":
-        return token == band.edit_token
-
-    return False
 
 
 def get_playlist_items(band, data):
     playlist_id = data.get("playlist_id")
     if playlist_id is None:
         playlist = get_default_playlist(band)
+        if playlist is None:
+            return
     else:
         playlist = db.session.get_one(Playlist, playlist_id)
 
@@ -165,18 +96,8 @@ def get_playlist_items(band, data):
         "items": [
             {
                 "id": item.id,
-                #"uuid": item.uuid,
                 "song_id": item.song_id,
                 "position": item.position,
-                #"meta": json.loads(item.meta) if item.meta else None,
-                #"song": {
-                #    "id": item.song.id,
-                #    "name": item.song.name,
-                #    "user_id": item.song.user_id,
-                #    "bpm": item.song.bpm,
-                #    "notes": item.song.notes,
-                #    "tags": [tag.name for tag in item.song.tags],
-                #},
             } for item in items
         ],
     }
@@ -193,7 +114,7 @@ def handle_connect(auth):
         return False
 
     band = db.session.query(Band).filter_by(addr=auth["band"]).first()
-    session.band = band
+    session["band"] = band
     #clients[request.sid] = auth.copy()
 
     if band:
@@ -326,7 +247,7 @@ def handle_play_item(data: Dict):
             else:
                 pos = 0
         else:
-            act_item = db.session.query(PlaylistItem).get(item_id)
+            act_item = db.session.get_one(PlaylistItem, item_id)
             pos = act_item.position + off
         item = db.session.query(PlaylistItem).filter_by(playlist_id=playlist_id, position=pos).first()
         item_id = None if item is None else item.id
@@ -344,7 +265,7 @@ def handle_play_item(data: Dict):
         {
             "playlist_id": playlist_id,
             "item_id": item_id,
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": dt.now(datetime.timezone.utc).isoformat(),
         },
         to=f"band_{band.id}",
     )
@@ -465,7 +386,7 @@ def create_playlist(data):
         return #jsonify({"error": "Missing required fields"}), 400
 
     try:
-        date = datetime.fromisoformat(date_str) if date_str else datetime.now().date()
+        date = dt.fromisoformat(date_str) if date_str else dt.now().date()
     except ValueError:
         return #jsonify({"error": "Invalid date format"}), 400
 
@@ -500,7 +421,7 @@ def on_save_playlist(data):
 
     date_str = data.get("date")
     try:
-        date = datetime.fromisoformat(date_str) if date_str else datetime.now().date()
+        date = dt.fromisoformat(date_str) if date_str else dt.now().date()
     except ValueError:
         raise
         #return jsonify({"error": "Invalid date format"}), 400
@@ -575,10 +496,9 @@ def save_song(data):
         return
 
     song = db.session.get_one(Song, data["id"])
-    name = data.get("name")
     # TODO: Check filter used TAG ID's for band_id!
 
-    tags = db.session.query(Tag).filter_by(band_id=band.id).all()#.order_by(Song.name).all()
+    tags = db.session.query(Tag).filter_by(band_id=band.id).all()
     for t in tags:
         if t.name not in data.get("tags", []):
             if t in song.tags:
@@ -625,7 +545,6 @@ def create_song(data):
 
 @socketio.on("batch")
 def batch(data):
-    req_cnt = 0
     for req in data.get('requests', []):
         cmd = req.get("cmd")
         arg = req.get("arg")
@@ -676,7 +595,6 @@ def create_app():
         app,
         host=app.config.get("HOST", "127.0.0.1"),
         port=app.config.get("PORT", 5000),
-        debug=app.config.get("DEBUG", True),
         allow_unsafe_werkzeug=True,
     )
 

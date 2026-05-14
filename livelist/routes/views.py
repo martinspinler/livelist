@@ -3,7 +3,7 @@ HTML views for Livelist
 """
 
 import flask.json
-from flask import redirect, render_template, request, url_for, make_response, current_app
+from flask import redirect, render_template, request, url_for, make_response
 from datetime import date
 
 from ..models import Band, Playlist, db

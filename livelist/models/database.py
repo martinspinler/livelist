@@ -2,10 +2,9 @@
 Database models for Livelist
 """
 
-import uuid
 from datetime import date as datetimedate
 from typing import Optional, List
-from sqlalchemy import ForeignKey, Index, String, Text, Integer, Date, Boolean, Table, Column
+from sqlalchemy import ForeignKey, Index, String, Text, Integer, Date, Table, Column
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from . import Base

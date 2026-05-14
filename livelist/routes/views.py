@@ -31,30 +31,49 @@ def check_privileges(band):
     return None
 
 
-# Browsers reject setting cookies for these local/special TLDs
-_LOCAL_TLDS = frozenset({"localhost", "local", "test", "example", "invalid"})
+def _get_domains() -> list[str]:
+    """Return the app's main domain from config (e.g. 'livelist.org').
+
+    Falls back to empty list when DOMAINS is not configured.
+    """
+    from flask import current_app
+    return current_app.config.get("DOMAINS", [])
+
+
+def _get_subdomain():
+    """Extract the subdomain from the request host, or None if there isn't one.
+
+    Uses the DOMAIN config setting to reliably distinguish between
+    the main domain (e.g. livelist.org → None) and a subdomain
+    (e.g. myband.livelist.org → 'myband').
+    """
+    host = request.host.split(":")[0]  # strip port
+    domains = _get_domains()
+
+    for domain in domains:
+        if host.endswith("." + domain):
+            return host[: -(len(domain) + 1)]
+
+    return None
 
 
 def _get_cookie_domain():
-    """Determine the domain for the auth cookie so it's shared across subdomains.
-
-    Priority:
-    1. Explicit COOKIE_DOMAIN from Flask config (useful for dev with /etc/hosts)
-    2. Auto-detected from request host (e.g. myband.livelist.org -> .livelist.org)
-    3. None (host-only cookie) if the TLD is local/special or host has no subdomain
+    """Determine the domain attribute for the auth cookie.
     """
-    from flask import current_app
-    explicit = current_app.config.get("COOKIE_DOMAIN")
-    if explicit:
-        return explicit
 
     host = request.host.split(":")[0]  # strip port
-    parts = host.split(".")
-    if len(parts) >= 2:
-        tld = parts[-1]
-        if tld in _LOCAL_TLDS:
-            return None
-        return "." + ".".join(parts[1:])
+    domains = _get_domains()
+
+    if host in domains:
+        return host
+
+    subdomain = _get_subdomain()
+    if subdomain is None:
+        return host
+    for domain in domains:
+        if host == (subdomain + "." + domain):
+            return domain
+
     return None
 
 
@@ -66,15 +85,6 @@ def _set_auth_cookie(response, auth_cookie):
         kwargs["domain"] = domain
     response.set_cookie('auth_data_simple', flask.json.dumps(auth_cookie), **kwargs)
     return response
-
-
-def _get_subdomain():
-    """Extract subdomain from request host, or None if no subdomain."""
-    host = request.host.split(":")[0]  # strip port
-    parts = host.split(".")
-    if len(parts) >= 2:
-        return parts[0]
-    return None
 
 
 @views_bp.route("/")

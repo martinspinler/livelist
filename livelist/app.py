@@ -19,6 +19,10 @@ from .routes.views import get_privileges, get_default_playlist
 # TODO: TAGS, edit song, create song
 # TODO: Play screen: do not switch played song immediately, let user to confirm
 
+# Load .env file (if present) before building the app config
+from dotenv import load_dotenv
+load_dotenv()
+
 # Initialize Flask app
 app = Flask(__name__)
 app.config.from_object(Config)

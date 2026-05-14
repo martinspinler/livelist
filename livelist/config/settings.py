@@ -2,20 +2,23 @@
 Flask configuration settings
 """
 
+import os
+
 
 class Config:
     """Base configuration"""
 
-    # Database
-    SQLALCHEMY_DATABASE_URI = 'sqlite:///livelist.db'
+    # Database — override via LIVELIST_DATABASE_URI env var
+    SQLALCHEMY_DATABASE_URI = os.environ.get(
+        "LIVELIST_DATABASE_URI", "sqlite:///livelist.db"
+    )
 
-    # Cookie domain for shared subdomain authentication.
-    # Set this to share the auth cookie across subdomains, e.g. '.livelist.org'.
-    # On production this is auto-detected from the request host.
-    # For local development with subdomains, set this to your dev domain
-    # (e.g. '.livelist.dev' if you added '127.0.0.1 myband.livelist.dev' to /etc/hosts).
-    # Leave as None for auto-detection (falls back to host-only cookies on localhost).
-    COOKIE_DOMAIN = None
+    # The app's main domains (e.g. ['livelist.org']).
+    # Used to distinguish subdomains from the bare domains and to set the
+    # shared cookie domain. Required for subdomain-based routing to work.
+    # Set via LIVELIST_DOMAINS env var.
+    # For local dev with /etc/hosts use something like 'livelist.dev'.
+    DOMAINS = list(filter(None, os.environ.get("LIVELIST_DOMAINS", "").split(":")))
 
 
 class DevelopmentConfig(Config):

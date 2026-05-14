@@ -20,9 +20,10 @@
                 <div class="card-body">
                     <p class="text-muted mb-4">Choose a band to view and manage playlists.</p>
 
+                    {% if bands %}
                     <div class="list-group">
                         {% for band in bands %}
-                        <a href="{{ url_for('views.view_band', band=band.addr) }}"
+                        <a href="{% if subdomain is not none and subdomain == band.addr %}/{% else %}{{ url_for('views.view_band', band=band.addr) }}{% endif %}"
                            class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
                             <div>
                                 <h5 class="mb-1">{{ band.name }}</h5>
@@ -32,13 +33,15 @@
                         </a>
                         {% endfor %}
                     </div>
+                    {% endif %}
 
                     <form action="/login" method="post">
+                    {% if subdomain is not none %}<input type="hidden" name="subdomain" value="{{ subdomain }}">{% endif %}
                     <div class="mt-4">
-                        <p class="text-muted">Or access by address:</p>
+                        <p class="text-muted">{% if subdomain is not none %}Enter key for {{ subdomain }}:{% else %}Or access by address and key:{% endif %}</p>
                         <div class="mb-3 xxinput-group">
                             <div class="mb-2">
-                                <input type="text" name="band_name" class="form-control" id="subdomain-input" placeholder="name" aria-label="Subdomain">
+                                <input type="text" name="band_name" class="form-control" id="subdomain-input" placeholder="name" aria-label="Subdomain"{% if subdomain is not none %} value="{{ subdomain }}" readonly="readonly"{% endif %}>
                                 <!--<label class="btn btn-sm btn-outline-primary bi bi-arrow-bar-up" for="subdomain-input">Before</label>-->
                             </div>
                             <div class="mb-2">
@@ -50,6 +53,12 @@
                         </div>
                     </div>
                     </form>
+
+                    {% if subdomain is not none %}
+                    <div class="mt-3">
+                        <a href="/login" class="text-muted small">Log out of {{ subdomain }}</a>
+                    </div>
+                    {% endif %}
                 </div>
             </div>
         </div>

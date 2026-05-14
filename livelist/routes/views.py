@@ -3,6 +3,7 @@ HTML views for Livelist
 """
 
 import flask.json
+from typing import Any
 from flask import redirect, render_template, request, url_for, make_response
 from datetime import date
 
@@ -30,11 +31,56 @@ def check_privileges(band):
     return None
 
 
+# Browsers reject setting cookies for these local/special TLDs
+_LOCAL_TLDS = frozenset({"localhost", "local", "test", "example", "invalid"})
+
+
+def _get_cookie_domain():
+    """Determine the domain for the auth cookie so it's shared across subdomains.
+
+    Priority:
+    1. Explicit COOKIE_DOMAIN from Flask config (useful for dev with /etc/hosts)
+    2. Auto-detected from request host (e.g. myband.livelist.org -> .livelist.org)
+    3. None (host-only cookie) if the TLD is local/special or host has no subdomain
+    """
+    from flask import current_app
+    explicit = current_app.config.get("COOKIE_DOMAIN")
+    if explicit:
+        return explicit
+
+    host = request.host.split(":")[0]  # strip port
+    parts = host.split(".")
+    if len(parts) >= 2:
+        tld = parts[-1]
+        if tld in _LOCAL_TLDS:
+            return None
+        return "." + ".".join(parts[1:])
+    return None
+
+
+def _set_auth_cookie(response, auth_cookie):
+    """Set the shared auth cookie on a response."""
+    domain = _get_cookie_domain()
+    kwargs: dict[str, Any] = {"max_age": 60 * 60 * 24 * 365 * 2}
+    if domain:
+        kwargs["domain"] = domain
+    response.set_cookie('auth_data_simple', flask.json.dumps(auth_cookie), **kwargs)
+    return response
+
+
+def _get_subdomain():
+    """Extract subdomain from request host, or None if no subdomain."""
+    host = request.host.split(":")[0]  # strip port
+    parts = host.split(".")
+    if len(parts) >= 2:
+        return parts[0]
+    return None
+
+
 @views_bp.route("/")
 def index():
-    subdomain = request.host.split(".")[0] if "." in request.host else None
-    if subdomain is not None and request.host in ["localhost"]:
-        return view_band_noredirect(subdomain)
+    subdomain = _get_subdomain()
+    force_login = request.args.get("force_login") is not None
 
     auth_cookie = flask.json.loads(request.cookies.get('auth_data_simple', "{}"))
     auth_bands = []
@@ -42,27 +88,63 @@ def index():
         if get_privileges(band_name, key):
             auth_bands.append(band_name)
 
-    #print(data)
-    #b = _get_current_band()
-    #if b is not None:
-    #    return view_band(b.name)
+    # On subdomain, if authenticated for that band and not forcing login, show band view directly
+    if not force_login and subdomain is not None and subdomain in auth_bands:
+        return view_band_noredirect(subdomain)
+
     bands = (
         db.session.query(Band)
         .filter(Band.addr.in_(auth_bands))
         .all()
     )
-    return render_template("index.html", bands=bands, bad_access=(request.args.get("auth_failed") is not None))
+    return render_template(
+        "index.html",
+        bands=bands,
+        bad_access=(request.args.get("auth_failed") is not None),
+        subdomain=subdomain,
+    )
 
 
-@views_bp.route("/login", methods=["POST"])
+@views_bp.route("/login", methods=["GET", "POST"])
 def login():
+    subdomain = _get_subdomain()
+
+    if request.method == "GET":
+        # GET /login handles logout: remove the subdomain band from the auth cookie,
+        # then redirect back to index (which will show login form since band is gone).
+        auth_cookie = flask.json.loads(request.cookies.get('auth_data_simple', "{}"))
+
+        # If on a subdomain, log out only that band
+        if subdomain and subdomain in auth_cookie:
+            del auth_cookie[subdomain]
+
+        # Determine redirect target based on remaining auth
+        auth_bands = [b for b, k in auth_cookie.items() if get_privileges(b, k)]
+        if subdomain and subdomain in auth_bands:
+            # Still authenticated (shouldn't happen after delete, but safety)
+            target = "/"
+        else:
+            # Not authenticated for subdomain anymore — index will show login form
+            target = "/?force_login"
+
+        response = make_response(redirect(target))
+        _set_auth_cookie(response, auth_cookie)
+        return response
+
+    # POST: process login form
     auth_cookie = flask.json.loads(request.cookies.get('auth_data_simple', "{}"))
     band_name = request.form.get("band_name")
     key = request.form.get("band_access_key")
+
     if get_privileges(band_name, key):
-        response = make_response(redirect(f'/band/{band_name}'))
         auth_cookie[band_name] = key
-        response.set_cookie('auth_data_simple', flask.json.dumps(auth_cookie), max_age=60*60*24*365*2)
+        # If logging into the same band as the current subdomain, stay on subdomain root
+        if subdomain == band_name:
+            target = "/"
+        else:
+            target = f'/band/{band_name}'
+        response = make_response(redirect(target))
+        _set_auth_cookie(response, auth_cookie)
         return response
 
     response = make_response(redirect('/?auth_failed'))

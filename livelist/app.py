@@ -9,11 +9,9 @@ from flask_socketio import SocketIO, emit, join_room, leave_room
 
 from sqlalchemy import and_, desc
 
-from .config import load_config
-
 from .config.settings import Config
 from .models import Band, Song, Playlist, PlaylistItem, Tag, db
-from .routes import api_bp, auth_bp, views_bp
+from .routes import auth_bp, views_bp
 from .routes.views import get_privileges, get_default_playlist
 
 
@@ -24,8 +22,6 @@ from .routes.views import get_privileges, get_default_playlist
 app = Flask(__name__)
 app.config.from_object(Config)
 
-# Load YAML configuration
-config_data = load_config()
 
 # Database setup
 db.init_app(app)
@@ -42,7 +38,6 @@ socketio = SocketIO(
 #sync_manager = PlaylistSyncManager(server_id=str(uuid.uuid4()))
 
 # Register blueprints
-app.register_blueprint(api_bp, url_prefix="/api")
 app.register_blueprint(views_bp)
 app.register_blueprint(auth_bp, url_prefix="/auth")
 

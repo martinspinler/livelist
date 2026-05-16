@@ -3,7 +3,7 @@ HTML views for Livelist
 """
 
 import flask.json
-from typing import Any
+from typing import Any, Optional
 from flask import redirect, render_template, request, url_for, make_response
 from datetime import date
 
@@ -173,7 +173,7 @@ def view_band(band):
         return redirect(request.scheme + "://" + band + "." + request.host)
     return view_band_noredirect(band)
 
-def get_default_playlist(band) -> Playlist | None:
+def get_default_playlist(band) -> Optional[Playlist]:
     # Get active playlist
     playlist = None
     if band.active_playlist_id:

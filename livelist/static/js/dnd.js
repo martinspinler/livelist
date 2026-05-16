@@ -4,45 +4,77 @@ function initDragAndDrop(s, handle_drag_and_drop) {
 
     let draggedItem = null;
     let draggedItemId = null;
-    let targetItem = null;
+    let isDragging = false;
+    let startClientY = 0;
+    let startClientX = 0;
 
-    livelist.addEventListener('dragstart', onDragStart);
-    livelist.addEventListener('dragover', onDragOver);
-    livelist.addEventListener('dragleave', onDragLeave);
-    livelist.addEventListener('drop', onDragDrop);
-    livelist.addEventListener('dragend', onDragEnd);
+    // Minimum distance in px before a pointer-down is considered a drag
+    const DRAG_THRESHOLD = 5;
 
-    function onDragStart(e) {
-        if (!e.target.classList.contains('drag-handle')) {
-            return;
-        }
+    livelist.addEventListener('pointerdown', onPointerDown);
 
-        draggedItem = e.target.closest(".livelist-item");
-        draggedItemId = draggedItem.dataset.itemId;
-        draggedItem.classList.add('dragging');
-        e.dataTransfer.effectAllowed = 'move';
-        //e.dataTransfer.setData('text/plain', draggedItemId);
+    function onPointerDown(e) {
+        const handle = e.target.closest('.drag-handle');
+        if (!handle) return;
 
-        // Hide the dragged item temporarily
-        setTimeout(() => {
-            //draggedItem.classList.add('d-none');
-            draggedItem.classList.add('disabled');
-        }, 0);
+        const item = handle.closest('.livelist-item');
+        if (!item) return;
+
+        draggedItem = item;
+        draggedItemId = item.dataset.itemId;
+        isDragging = false;
+        startClientX = e.clientX;
+        startClientY = e.clientY;
+
+        // Listen on document so we receive move/up regardless of where the
+        // pointer travels.  We do NOT call setPointerCapture here – doing so
+        // would prevent the browser from dispatching the normal click event
+        // that the rest of the application relies on.
+        document.addEventListener('pointermove', onPointerMove);
+        document.addEventListener('pointerup', onPointerUp);
+        document.addEventListener('pointercancel', onPointerUp);
     }
 
-    function onDragOver(e) {
-        e.preventDefault();
-        e.stopPropagation();
+    function onPointerMove(e) {
+        if (!draggedItem) return;
 
-        // Check if the event target is a drag handle
-        const targetItem = e.target.closest(".livelist-item");
-        if (!targetItem || targetItem == draggedItem) {
-            return;
+        const dx = e.clientX - startClientX;
+        const dy = e.clientY - startClientY;
+
+        // Wait until the pointer has moved beyond the threshold before
+        // committing to a drag – this avoids accidental drags on clicks.
+        if (!isDragging) {
+            if (Math.abs(dx) < DRAG_THRESHOLD && Math.abs(dy) < DRAG_THRESHOLD) {
+                return;
+            }
+            isDragging = true;
+            draggedItem.classList.add('dragging');
+
+            // Now that we are definitely dragging, capture the pointer for
+            // reliable event tracking and to suppress the click that would
+            // otherwise fire on pointerup.
+            livelist.setPointerCapture(e.pointerId);
         }
+
+        // Hide the dragged item's real element temporarily so that
+        // elementFromPoint returns the element *underneath* it.
+        draggedItem.style.display = 'none';
+
+        const targetEl = document.elementFromPoint(e.clientX, e.clientY);
+
+        // Restore visibility immediately.
+        draggedItem.style.display = '';
+
+        // Clear visual feedback from all items.
+        clearDragClasses();
+
+        if (!targetEl) return;
+
+        const targetItem = targetEl.closest('.livelist-item');
+        if (!targetItem || targetItem === draggedItem) return;
 
         targetItem.classList.add('drag-over');
 
-        // Visual feedback: show where the item will be inserted
         const rect = targetItem.getBoundingClientRect();
         const before = e.clientY < rect.top + rect.height / 2;
 
@@ -55,67 +87,67 @@ function initDragAndDrop(s, handle_drag_and_drop) {
         }
     }
 
-    function onDragLeave(e) {
-        e.preventDefault();
-        e.stopPropagation();
+    function onPointerUp(e) {
+        document.removeEventListener('pointermove', onPointerMove);
+        document.removeEventListener('pointerup', onPointerUp);
+        document.removeEventListener('pointercancel', onPointerUp);
 
-        // Check if the event target is a drag handle
-        const targetItem = e.target.closest(".livelist-item");
-        if (!targetItem) {
-            return;
+        if (isDragging) {
+            try {
+                livelist.releasePointerCapture(e.pointerId);
+            } catch (_) {
+                // May already be released
+            }
         }
 
-        targetItem.classList.remove('drag-over', 'drag-before', 'drag-after');
+        if (!draggedItem) return;
+
+        if (isDragging) {
+            // Determine the drop target from the final pointer position.
+            draggedItem.style.display = 'none';
+            const targetEl = document.elementFromPoint(e.clientX, e.clientY);
+            draggedItem.style.display = '';
+
+            const targetItem = targetEl ? targetEl.closest('.livelist-item') : null;
+
+            if (targetItem && draggedItem !== targetItem) {
+                const draggedPliId = draggedItem.dataset.itemId;
+                const targetPliId = targetItem.dataset.itemId;
+
+                const rect = targetItem.getBoundingClientRect();
+                const before = e.clientY < rect.top + rect.height / 2;
+
+                const msg = {
+                    moved_ids: [parseInt(draggedPliId)],
+                    target_id: parseInt(targetPliId),
+                    before: before,
+                    playlist_id: state.currentPlaylist,
+                };
+
+                handle_drag_and_drop(msg);
+            }
+        }
+
+        // Clean up
+        cleanupDrag();
     }
 
-    function onDragDrop(e) {
-        e.preventDefault();
-        e.stopPropagation();
+    function clearDragClasses() {
+        livelist.querySelectorAll('.livelist-item').forEach(item => {
+            item.classList.remove('drag-over', 'drag-before', 'drag-after');
+        });
+    }
 
-        // Check if the event target is a drag handle
-        const targetItem = e.target.closest(".livelist-item");
-        if (!targetItem) {
-            return;
+    function cleanupDrag() {
+        if (draggedItem) {
+            draggedItem.classList.remove('dragging', 'disabled', 'd-none');
+            draggedItem.style.display = '';
         }
 
-        // Remove drag classes
-        if (draggedItem) draggedItem.classList.remove('disabled');
-        if (draggedItem) draggedItem.classList.remove('dragging', 'd-none');
-        if (targetItem) targetItem.classList.remove('drag-over', 'drag-before', 'drag-after');
+        clearDragClasses();
 
-        // Calculate new position
-        if (draggedItem && targetItem && draggedItem !== targetItem) {
-            const draggedPliId = draggedItem.dataset.itemId;
-            const targetPliId = targetItem.dataset.itemId;
-
-            // Determine direction
-            const rect = targetItem.getBoundingClientRect();
-            const before = e.clientY < rect.top + rect.height / 2;
-
-            // Send async message to server with move instruction
-            const msg = {
-                moved_ids: [parseInt(draggedPliId)],
-                target_id: parseInt(targetPliId),
-                before: before,
-                playlist_id: state.currentPlaylist,
-            }
-
-			handle_drag_and_drop(msg);
-        } else {
-        }
-
-        // Reset
         draggedItem = null;
         draggedItemId = null;
-    }
-
-    function onDragEnd(e) {
-        // Clean up any remaining drag classes
-        const items = livelist.querySelectorAll('.list-group-item');
-        items.forEach(item => {
-            item.classList.remove('dragging', 'drag-over', 'drag-before', 'drag-after', 'd-none');
-
-            item.classList.remove('disabled');
-        });
+        isDragging = false;
     }
 }

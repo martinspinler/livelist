@@ -22,6 +22,7 @@
 
 .drag-handle {
     cursor: grab;
+    touch-action: none;
 }
 
 /* Livelist item styling */

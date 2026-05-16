@@ -11,7 +11,8 @@
 {% block content %}
 
 <template id="playlist-item-template">
-    <li class="playlist-item list-group-item list-group-item-action xbtn-group xbtn-group-sm playlist-select-item playlist-btn-select">
+    <li
+        class="playlist-item list-group-item list-group-item-action xbtn-group xbtn-group-sm playlist-select-item playlist-btn-select">
         <div class="xlist-group-item xlist-group-item-action d-flex justify-content-between align-items-center">
             <div>
                 <div class="playlist-item-name fw-bold"></div>
@@ -22,8 +23,10 @@
             </div>
 
             <div>
-                <button class="btn bi bi-broadcast activate-playlist-btn playlist-btn-activate" data-Xbs-dismiss="offcanvas"></button>
-                <button class="btn btn-outline-primary bi bi-pencil playlist-btn-edit" data-bs-toggle="modal" data-bs-target="#edit-playlist-modal"></button>
+                <button class="btn bi bi-broadcast activate-playlist-btn playlist-btn-activate"
+                    data-Xbs-dismiss="offcanvas"></button>
+                <button class="btn btn-outline-primary bi bi-pencil playlist-btn-edit" data-bs-toggle="modal"
+                    data-bs-target="#edit-playlist-modal"></button>
                 <button class="btn btn-outline-danger bi bi-trash playlist-btn-delete dd-none"></button>
             </div>
         </div>
@@ -31,7 +34,7 @@
 </template>
 
 <template id="livelist-item-template">
-    <li class="drag-handle livelist-item list-group-item list-group-item-action d-flex align-items-center gap-2" draggable="true">
+    <li class="drag-handle livelist-item list-group-item list-group-item-action d-flex align-items-center gap-2">
         <span class="bi bi-grip-vertical text-muted d-none"></span>
         <div class="livelist-item-positions" role="group">
             <span class="livelist-item-position btn btn-primary"></span>
@@ -42,7 +45,7 @@
             <small class="song-user_id text-muted"></small>
             <small class="song-tags text-muted"></small>
         </div>
-            <button class="btn livelist-item-anchor d-none">&#x2693;</button>
+        <button class="btn livelist-item-anchor d-none">&#x2693;</button>
         <div class="btn-group xbtn-group-sm livelist-item-btn-group-right">
             <button class="btn btn-danger bi bi-trash livelist-item-delete d-none" title="Delete"></button>
             <button class="btn bi bi-play-fill livelist-item-play" title="Play"></button>
@@ -57,7 +60,8 @@
 
 
 <template id="songlist-item-template">
-    <button class="list-group-item list-group-item-action d-flex justify-content-between align-items-center songlist-item">
+    <button
+        class="list-group-item list-group-item-action d-flex justify-content-between align-items-center songlist-item">
         <div>
             <div class="songlist-item-name fw-bold"></div>
             <small class="songlist-item-meta text-muted"></small>
@@ -66,7 +70,8 @@
             </div>
         </div>
         <span class="btn btn-sm btn-outline-primary bi bi-plus-circle-fill text-primary songlist-mode-add"></span>
-        <span class="btn btn-sm btn-outline-warning bi bi-pencil-fill text-warning songlist-mode-edit d-none" data-bs-toggle="modal" data-bs-target="#edit-song-modal"></span>
+        <span class="btn btn-sm btn-outline-warning bi bi-pencil-fill text-warning songlist-mode-edit d-none"
+            data-bs-toggle="modal" data-bs-target="#edit-song-modal"></span>
     </button>
 </template>
 
@@ -81,15 +86,18 @@
     <div class="container-fluid mt-2">
         <div id="nav-main">
             <button class="btn btn-outline-primary bi bi-plus mx-lg-2" data-bs-toggle="offcanvas"
-                    data-bs-target="#songlist-panel" id="btn-songlist-panel">Add Song</button>
+                data-bs-target="#songlist-panel" id="btn-songlist-panel">Add Song</button>
             <button class="btn btn-outline-primary bi bi-list-ul mx-lg-2" data-bs-toggle="offcanvas"
-                    data-bs-target="#playlist-panel">Playlists</button>
-            <a class="btn btn-outline-primary bi bi-file-play mx-lg-2" href="{{ url_for('views.play_view', playlist_id=playlist.id) if playlist else '#' }}"
-            target="_blank">Live</a>
+                data-bs-target="#playlist-panel">Playlists</button>
+            <a class="btn btn-outline-primary bi bi-file-play mx-lg-2"
+                href="{{ url_for('views.play_view', playlist_id=playlist.id) if playlist else '#' }}"
+                target="_blank">Live</a>
         </div>
         <div id="nav-edit" class="d-none">
-            <button class="btn btn-danger bi bi-trash  xd-none" id="livelist-delete-selected" title="Delete selected">Delete selected</button>
-            <button class="btn btn-warning bi bi-sort-numeric-down" id="edit-sort" title="Update order">Update order</button>
+            <button class="btn btn-danger bi bi-trash  xd-none" id="livelist-delete-selected"
+                title="Delete selected">Delete selected</button>
+            <button class="btn btn-warning bi bi-sort-numeric-down" id="edit-sort" title="Update order">Update
+                order</button>
         </div>
         <button class="btn btn-outline-primary bi bi-pencil-fill mx-lg-2" id="toggle-edit">Edit</button>
     </div>
@@ -99,7 +107,8 @@
 <div class="container-fluid">
     <!-- Current Playlist Header -->
     <div class="card mb-3 mt-3">
-        <div class="card-header list-group-item-action d-flex justify-content-between align-items-center" id="livelist-header">
+        <div class="card-header list-group-item-action d-flex justify-content-between align-items-center"
+            id="livelist-header">
             <div class="mb-0">
                 <span id="playlist-set-name">Set 1</span>
             </div>
@@ -123,7 +132,8 @@
 <div class="offcanvas offcanvas-start" tabindex="-1" id="songlist-panel">
     <div class="offcanvas-header">
         <h5 class="offcanvas-title">Song Library</h5>
-        <button type="button" class="btn btn-outline-primary bi bi-pencil-fill float-end" id="songlist-panel-edit"></button>
+        <button type="button" class="btn btn-outline-primary bi bi-pencil-fill float-end"
+            id="songlist-panel-edit"></button>
         <button type="button" class="btn btn-pin bi bi-pin-fill float-end" id="songlist-panel-pin"></button>
         <button type="button" class="btn-close" data-bs-dismiss="offcanvas"></button>
     </div>
@@ -131,9 +141,12 @@
         <!-- Filter controls -->
         <div class="mb-3">
             <div class="input-group mb-2">
-                <input type="text padding-right" class="form-control" id="song-filter" placeholder="Type or use keypad...">
-                <button class="btn btn-outline-warning bi bi-plus songlist-mode-edit d-none" type="button" id="songlist-song-create"></button>
-                <button class="btn btn-outline-secondary bi bi-keyboard songlist-mode-add" type="button" id="songlist-toggle-keypad"></button>
+                <input type="text padding-right" class="form-control" id="song-filter"
+                    placeholder="Type or use keypad...">
+                <button class="btn btn-outline-warning bi bi-plus songlist-mode-edit d-none" type="button"
+                    id="songlist-song-create"></button>
+                <button class="btn btn-outline-secondary bi bi-keyboard songlist-mode-add" type="button"
+                    id="songlist-toggle-keypad"></button>
             </div>
             <div class="keypad-container mb-2 d-none" id="keypad-container">
                 <div class="d-flex flex-wrap gap-1 justify-content-center">

@@ -1,12 +1,5 @@
 "use strict";
 
-/*
-TODO: retain songlist filter after songlist update
-TODO: handle playlist name/date update in nav/header
-TODO: update song name in all clients after one changes
-TODO: after delete last, turn off livelist edit mode
-*/
-
 function initApplication() {
     const socket = state.io(window.Location.host, state.socket_auth);
 
@@ -61,6 +54,16 @@ function initApplication() {
     }
 
     /* Livelist */
+    function livelist_update_song_items() {
+        document.querySelectorAll('.livelist-item').forEach(item_e => {
+            const song = state.songlist.get(parseInt(item_e.dataset.songId));
+            if (song) {
+                item_e.querySelector('.song-name').textContent = song.name;
+                item_e.querySelector('.song-tags').textContent = song.tags.join(",");
+            }
+        });
+    }
+
     function livelist_update_playing_item(itemId) {
         const old_ie = document.querySelectorAll('.livelist-item');
         const new_ie = document.querySelector(`.livelist-item[data-item-id="${itemId}"]`);
@@ -253,6 +256,8 @@ function initApplication() {
 
         edit_song_update_tags(state.songlist.get(state.edit_song_id));
         update_songlist_panel_edit();
+        livelist_update_song_items();
+        filterSongs();
 
         /* HOTFIX(synchronization) */
         if (state.songlistFetched == false) {
@@ -460,8 +465,10 @@ function initApplication() {
         }
 
         function handle_songlist_create_song(ev) {
-            const name = document.getElementById("song-filter").value;
-            state.socket.emit("create_song", {name: name});
+            const filterInput = document.getElementById("song-filter");
+            state.socket.emit("create_song", {name: filterInput.value});
+            filterInput.value = '';
+            filterSongs();
         }
 
         // Playlist item actions
@@ -650,6 +657,7 @@ function initApplication() {
         }
 
         state.socket.emit("save_song", data);
+        bootstrap.Modal.getInstance(document.getElementById('edit-song-modal')).hide();
     }
 
     function addSongToPlaylist(id) {
@@ -835,6 +843,7 @@ function initApplication() {
             date: document.getElementById('edit-playlist-date').value,
         }
         state.socket.emit("save_playlist", data);
+        bootstrap.Modal.getInstance(document.getElementById('edit-playlist-modal')).hide();
     }
 
     function editSort() {

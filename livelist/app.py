@@ -3,9 +3,8 @@ import click
 import json
 import datetime
 from datetime import datetime as dt
-from typing import Dict, Optional
 
-from flask import Flask, render_template, request, session
+from flask import Flask, render_template, session
 from flask_socketio import SocketIO, emit, join_room, leave_room
 
 from sqlalchemy import and_, desc
@@ -43,48 +42,26 @@ socketio = SocketIO(
 app.register_blueprint(views_bp)
 
 
-def get_current_band() -> Band:
-    """get current band based on subdomain or url parameter"""
+def get_band() -> Band:
+    """get current band based on session variable (authentised) """
 
     band = session.get("band")
-    assert isinstance(band, Band), "session has no band — not connected?"
+    if not isinstance(band, Band):
+        raise ValueError("No band")
     return band
 
-# Helper functions
-def xget_current_band() -> Optional[Band]:
-    """Get current band based on subdomain or URL parameter"""
-    # Try subdomain first
-    host = request.host
-    subdomain = host.split(".")[0] if "." in host else None
 
-    # Try URL parameter
-    if request.args is None or request.view_args is None:
-        raise Exception("")
-    band_name = request.args.get("band") or request.view_args.get("band_name")
-    #band_name ="testband"
-
-    if subdomain:
-        band = db.session.query(Band).filter_by(addr=subdomain).first()
-        if band:
-            return band
-
-    if band_name:
-        band = db.session.query(Band).filter_by(addr=band_name).first()
-        if band:
-            return band
-
-    return None
-
-
-def get_playlist_items(band, data):
+def get_playlist(band: Band, data):
+    """Get playlist specified in data request and check if belongs to the band"""
     playlist_id = data.get("playlist_id")
-    if playlist_id is None:
-        playlist = get_default_playlist(band)
-        if playlist is None:
-            return
-    else:
-        playlist = db.session.get_one(Playlist, playlist_id)
+    playlist = db.session.get_one(Playlist, playlist_id)
+    if playlist is None or band.id != playlist.band_id:
+        raise ValueError()
 
+    return playlist
+
+
+def get_playlist_items(playlist: Playlist):
     items = (
         db.session.query(PlaylistItem)
         .filter_by(playlist_id=playlist.id)
@@ -107,78 +84,62 @@ def get_playlist_items(band, data):
     }
 
 
-clients = {}
-
 # WebSocket event handlers
 @socketio.on("connect")
 def handle_connect(auth):
     """Handle WebSocket connection"""
-    #print("Connected WS", request, auth)
+
     if auth is None or get_privileges(auth.get("band"), auth.get("key")) is None:
         return False
 
     band = db.session.query(Band).filter_by(addr=auth["band"]).first()
     session["band"] = band
-    #clients[request.sid] = auth.copy()
 
     if band:
         join_room(f"band_{band.id}")
         emit("connected", {"band_id": band.id})
-
-        #playlist.active_item_id = item_id
-        #    db.session.commit()
-        #    # Broadcast play event
-        #    emit(
-        #        "item_played",
-        #        {
-        #            "playlist_id": playlist_id,
-        #            "item_id": item_id,
-        #            "timestamp": datetime.utcnow().isoformat(),
-        #        },
-        #        room=f"band_{band.id}",
-        #    )
 
 
 @socketio.on("disconnect")
 def handle_disconnect():
     """Handle WebSocket disconnection"""
 
-    band = get_current_band()
-    if band:
-        leave_room(f"band_{band.id}")
-    #del clients[request.sid]
+    leave_room(f"band_{get_band().id}")
 
 
 @socketio.on("select_playlist")
-def handle_select_playlist(data: Dict):
+def handle_select_playlist(data: dict):
     """Handle playlist update from client"""
-    band = get_current_band()
-    if not band:
-        return
-    res = get_playlist_items(band, data)
+    band = get_band()
+    try:
+        playlist = get_playlist(band, data)
+    except Exception:
+        playlist = get_default_playlist(band)
+        if playlist is None:
+            return
+
+    res = get_playlist_items(playlist)
 
     emit("playlist_select", res) #, to=f"band_{band.id}")
 
+
 @socketio.on("activate_playlist")
-def handle_activate_playlist(data: Dict):
+def handle_activate_playlist(data: dict):
     """Handle playlist update from client"""
-    band = get_current_band()
-    if not band:
-        return
+    band = get_band()
+    playlist = get_playlist(band, data)
 
-    playlist_id = data.get("playlist_id")
-    if isinstance(playlist_id, int):
-        playlist = db.session.get_one(Playlist, playlist_id)
-        band.active_playlist_id = playlist.id
+    band.active_playlist_id = playlist.id
 
-        db.session.add(band)
-        db.session.commit()
-        emit("playlist_activated", {"playlist_id": playlist.id}, to=f'band_{band.id}')
+    db.session.add(band)
+    db.session.commit()
+
+    emit("playlist_activated", {"playlist_id": playlist.id}, to=f'band_{band.id}')
 
 
-def get_band_playlists(data):
+def get_band_playlists(band):
     """Get all playlists for a band"""
-    band = get_current_band()
+    band = get_band()
 
     playlists = (
         db.session.query(Playlist)
@@ -191,7 +152,6 @@ def get_band_playlists(data):
         [
             {
                 "id": p.id,
-                #"uuid": p.uuid,
                 "name": p.name,
                 "date": p.date.isoformat(),
                 "band_id": p.band_id,
@@ -203,39 +163,32 @@ def get_band_playlists(data):
     )
     return res
 
+
 @socketio.on("get_playlists")
 def on_get_band_playlists(data):
-    res = get_band_playlists(data)
+    res = get_band_playlists(get_band())
     emit("playlists", res)
 
 
 @socketio.on("playlist_update")
-def handle_playlist_update(data: Dict):
+def handle_playlist_update(data: dict):
     """Handle playlist update from client"""
 
-    band = get_current_band()
-    if not band:
-        return
-
-    res = get_playlist_items(band, data)
+    band = get_band()
+    playlist = get_playlist(band, data)
+    res = get_playlist_items(playlist)
 
     emit("playlist_updated", res, to=f"band_{band.id}") #, include_self=False)
 
 
 @socketio.on('play_item')
-def handle_play_item(data: Dict):
+def handle_play_item(data: dict):
     """Handle play item event"""
-    band = get_current_band()
-    if not band:
-        return
+    band = get_band()
+    playlist = get_playlist(band, data)
 
+    playlist_id = playlist.id
     item_id = data.get("item_id")
-    playlist_id = data.get("playlist_id")
-
-    # Update active item in playlist
-    playlist = db.session.query(Playlist).get(playlist_id)
-    if playlist is None or playlist.band_id != band.id:
-        return
 
     # Relative position
     if item_id is None:
@@ -245,7 +198,12 @@ def handle_play_item(data: Dict):
             return
 
         if item_id is None:
-            litem = db.session.query(PlaylistItem).filter_by(playlist_id=playlist_id).order_by(desc(PlaylistItem.position)).first()
+            litem = (
+                db.session.query(PlaylistItem)
+                .filter_by(playlist_id=playlist_id)
+                .order_by(desc(PlaylistItem.position))
+                .first()
+            )
             if litem is not None and off < 0:
                 pos = litem.position
             else:
@@ -253,7 +211,12 @@ def handle_play_item(data: Dict):
         else:
             act_item = db.session.get_one(PlaylistItem, item_id)
             pos = act_item.position + off
-        item = db.session.query(PlaylistItem).filter_by(playlist_id=playlist_id, position=pos).first()
+
+        item = (
+            db.session.query(PlaylistItem)
+            .filter_by(playlist_id=playlist_id, position=pos)
+            .first()
+        )
         item_id = None if item is None else item.id
 
     item = db.session.query(PlaylistItem).get(item_id)
@@ -278,10 +241,14 @@ def handle_play_item(data: Dict):
 @socketio.on("add_song")
 def add_playlist_item(data):
     """Add a song to a playlist"""
+    band = get_band()
+    playlist = get_playlist(band, data)
+    playlist_id = playlist.id
+
     song_id = data.get("song_id")
-    playlist_id = data.get("playlist_id")
     target_id = data.get("target_id")
     before = data.get("before", False)
+
     if not song_id:
         return
 
@@ -315,19 +282,26 @@ def add_playlist_item(data):
 
 @socketio.on("move_item")
 def on_move(data):
-    playlist_id = data.get("playlist_id")
-    items = db.session.query(PlaylistItem).filter_by(playlist_id=playlist_id).order_by(PlaylistItem.position.asc()).all()
+    band = get_band()
+    playlist = get_playlist(band, data)
+    playlist_id = playlist.id
+
+    items = (
+        db.session.query(PlaylistItem)
+        .filter_by(playlist_id=playlist_id)
+        .order_by(PlaylistItem.position.asc())
+        .all()
+    )
     before = data.get("before")
     moved_ids = data.get("moved_ids")
     target_id = data.get("target_id")
     moved_dict = {x: moved_ids.index(x.id) for x in items if x.id in moved_ids}
     moved = list(dict(sorted(moved_dict.items(), key=lambda item: item[1])).keys())
     target = ([x for x in items if x.id == target_id] + [None])[0]
-    result = []
     if target in moved:
-        #del moved[target]
         moved.remove(target)
 
+    result = []
     for i, item in enumerate(items):
         if item == target and before:
             result.extend(moved)
@@ -340,14 +314,16 @@ def on_move(data):
         if i != item.position:
             item.position = i
             db.session.add(item)
+
     db.session.commit()
     handle_playlist_update({"playlist_id": playlist_id})
 
 
 @socketio.on("delete_items")
 def on_delete_item(data):
-    playlist_id = data.get("playlist_id")
-    playlist = db.session.get_one(Playlist, playlist_id)
+    band = get_band()
+    playlist = get_playlist(band, data)
+    playlist_id = playlist.id
 
     items = (
         db.session.query(PlaylistItem)
@@ -382,69 +358,66 @@ def on_delete_item(data):
 def create_playlist(data):
     """Create a new playlist"""
 
-    band_id = data.get("band_id")
-    name = data.get("name")
+    band = get_band()
     date_str = data.get("date")
-
-    if not band_id or not name:
-        return #jsonify({"error": "Missing required fields"}), 400
 
     try:
         date = dt.fromisoformat(date_str) if date_str else dt.now().date()
     except ValueError:
-        return #jsonify({"error": "Invalid date format"}), 400
+        return
 
-    playlist = Playlist(band_id=band_id, name=name, date=date)
+    playlist = Playlist(band_id=band.id, name=data.get("name"), date=date)
 
     db.session.add(playlist)
     db.session.commit()
 
-    res = get_band_playlists(data)
-    emit("playlists", res, to=f'band_{band_id}')
+    res = get_band_playlists(band)
+    emit("playlists", res, to=f'band_{band.id}')
 
-    res = get_playlist_items(get_current_band(), {"playlist_id": playlist.id})
-    emit("playlist_created", res) #{"playlist_id": playlist.id, "active_item_id": None})
+    res = get_playlist_items(playlist)
+    emit("playlist_created", res)
 
 
 @socketio.on("delete_playlist")
 def on_delete_playlist(data):
-    item = db.session.get_one(Playlist, data.get("playlist_id"))
+    band = get_band()
+    playlist = get_playlist(band, data)
 
-    db.session.delete(item)
+    db.session.delete(playlist)
     db.session.commit()
 
-    res = get_band_playlists(data)
-    band = get_current_band()
+    res = get_band_playlists(band)
 
     emit("playlists", res)
     emit("playlists", res, to=f'band_{band.id}', include_self=False)
 
+
 @socketio.on("save_playlist")
 def on_save_playlist(data):
-    item = db.session.get_one(Playlist, data.get("playlist_id"))
+    band = get_band()
+    playlist = get_playlist(band, data)
 
     date_str = data.get("date")
     try:
         date = dt.fromisoformat(date_str) if date_str else dt.now().date()
     except ValueError:
         raise
-        #return jsonify({"error": "Invalid date format"}), 400
-    item.name = data.get("name")
-    item.date = date
-    db.session.add(item)
+
+    playlist.name = data.get("name")
+    playlist.date = date
+    db.session.add(playlist)
     db.session.commit()
 
-    res = get_band_playlists(data)
-    band = get_current_band()
-
-    #emit("playlists", res)
-    #emit("playlists", res, to=f'band_{band.id}', include_self=False)
+    res = get_band_playlists(band)
     emit("playlists", res, to=f'band_{band.id}')
+
+    res = get_playlist_items(playlist)
+    emit("playlist_updated", res, to=f"band_{band.id}")
 
 
 @socketio.on("get_songlist")
-def get_songs(data):
-    band = get_current_band()
+def get_songs(data={}):
+    band = get_band()
 
     songs = db.session.query(Song).filter_by(band_id=band.id).order_by(Song.name).all()
     tags = db.session.query(Tag).filter_by(band_id=band.id).all()#.order_by(Song.name).all()
@@ -470,36 +443,34 @@ def get_songs(data):
         ],
     }
 
-    emit("songlist", res)
+    emit("songlist", res, to=f"band_{band.id}")
 
 
 @socketio.on("create_tag")
 def create_tag(data):
     """Create a new tag"""
 
-    band = get_current_band()
-    if not band:
-        return
+    band = get_band()
 
     name = data.get("name")
+    if not name:
+        return
 
     tag = Tag(band_id=band.id, name=name)
 
     db.session.add(tag)
     db.session.commit()
 
-    get_songs({})
+    get_songs()
 
 
 @socketio.on("save_song")
 def save_song(data):
-    """Create a new tag"""
+    """Update song"""
 
-    band = get_current_band()
-    if not band:
-        return
+    band = get_band()
 
-    song = db.session.get_one(Song, data["id"])
+    song = db.session.get_one(Song, data.get("id"))
     # TODO: Check filter used TAG ID's for band_id!
 
     tags = db.session.query(Tag).filter_by(band_id=band.id).all()
@@ -522,18 +493,19 @@ def save_song(data):
     db.session.add(song)
     db.session.commit()
 
-    get_songs({})
+    get_songs()
 
 
 @socketio.on("create_song")
 def create_song(data):
-    band = get_current_band()
-    if not band:
+    band = get_band()
+    name = data.get("name")
+    if not name:
         return
 
     song = Song(
         band_id=band.id,
-        name=data.get("name"),
+        name=name,
         user_id=data.get("user_id"),
         bpm=data.get("bpm"),
         #notes=data.get("notes"),
@@ -544,7 +516,7 @@ def create_song(data):
     db.session.add(song)
     db.session.commit()
 
-    get_songs({})
+    get_songs()
 
 
 @socketio.on("batch")
@@ -554,6 +526,8 @@ def batch(data):
         arg = req.get("arg")
         if cmd == "create_song":
             create_song(arg)
+
+
 # Error handlers
 @app.errorhandler(404)
 def not_found_error(error):

@@ -173,7 +173,7 @@ def view_band(band):
         return redirect(request.scheme + "://" + band + "." + request.host)
     return view_band_noredirect(band)
 
-def get_default_playlist(band):
+def get_default_playlist(band) -> Playlist | None:
     # Get active playlist
     playlist = None
     if band.active_playlist_id:

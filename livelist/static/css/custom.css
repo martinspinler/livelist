@@ -8,13 +8,14 @@
 
 .drag-handle {
     cursor: move;
-/*    opacity: 0.5;*/
+    /*    opacity: 0.5;*/
     transition: opacity 0.2s;
 }
 
 .drag-handle:hover {
     opacity: 1;
 }
+
 .container-fluid {
     --bs-gutter-x: 1.0em;
 }
@@ -26,11 +27,13 @@
 /* Livelist item styling */
 
 .livelist-item.list-group-item-action {
-	color: var(--bs-list-group-color);
+    color: var(--bs-list-group-color);
 }
-.songlist-item.list-group-item.active{
+
+.songlist-item.list-group-item.active {
     background-color: rgb(from var(--bs-list-group-active-bg) r g b / 50%)
 }
+
 .playlist-item.list-group-item.active {
     background-color: rgb(from var(--bs-list-group-active-bg) r g b / 50%)
 }
@@ -38,6 +41,7 @@
 li.livelist-item .drag-handle:active {
     cursor: grabbing;
 }
+
 #livelist-header {
     padding-top: 0.3em;
     padding-bottom: 0.3em;
@@ -47,26 +51,27 @@ li.livelist-item .drag-handle:active {
     box-sizing: border-box;
 }
 
-.livelist-item-position, .livelist-item-selectbox {
+.livelist-item-position,
+.livelist-item-selectbox {
     min-width: 3.0em;
 }
 
 .livelist-item.list-group-item.drag-over {
-/*    border: 2px dashed #0d6efd; */
+    /*    border: 2px dashed #0d6efd; */
     box-shadow: inset 2px 2px 0px #0d6efd,
-                inset -2px -2px 0px #0d6efd;
+        inset -2px -2px 0px #0d6efd;
 }
 
 .livelist-item.list-group-item.drag-before {
-/*    border-top: 2px dashed #0d6efd;*/
+    /*    border-top: 2px dashed #0d6efd;*/
     box-shadow: inset 2px 7px 0px #0d6efd,
-                inset -2px -2px 0px #0d6efd;
+        inset -2px -2px 0px #0d6efd;
 }
 
 .livelist-item.list-group-item.drag-after {
-/*    border-bottom: 2px dashed #0d6efd;*/
+    /*    border-bottom: 2px dashed #0d6efd;*/
     box-shadow: inset 2px 2px 0px #0d6efd,
-                inset -2px -7px 0px #0d6efd;
+        inset -2px -7px 0px #0d6efd;
 }
 
 /* Playlist item styling */
@@ -103,8 +108,8 @@ li.livelist-item .drag-handle:active {
 
 /* Song list edit */
 #edit-song-tags {
-	display: flex;
-	flex-wrap: wrap;
+    display: flex;
+    flex-wrap: wrap;
 }
 
 /* Keypad styling */
@@ -120,7 +125,7 @@ li.livelist-item .drag-handle:active {
     display: grid;
 }
 
-#keypad-container > div {
+#keypad-container>div {
     max-width: 15em;
 }
 
@@ -129,7 +134,8 @@ li.livelist-item .drag-handle:active {
     .playlist-item .btn-group {
         flex-direction: column;
     }
-/*
+
+    /*
     .keypad-btn {
         width: 50px;
         height: 50px;

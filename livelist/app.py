@@ -239,7 +239,7 @@ def handle_play_item(data: dict):
 
 
 @socketio.on("add_song")
-def add_playlist_item(data):
+def add_playlist_item(data, broadcast=True):
     """Add a song to a playlist"""
     band = get_band()
     playlist = get_playlist(band, data)
@@ -447,7 +447,7 @@ def get_songs(data={}):
 
 
 @socketio.on("create_tag")
-def create_tag(data):
+def create_tag(data, broadcast=True):
     """Create a new tag"""
 
     band = get_band()
@@ -461,11 +461,12 @@ def create_tag(data):
     db.session.add(tag)
     db.session.commit()
 
-    get_songs()
+    if broadcast:
+        get_songs()
 
 
 @socketio.on("save_song")
-def save_song(data):
+def save_song(data, broadcast=True):
     """Update song"""
 
     band = get_band()
@@ -493,11 +494,12 @@ def save_song(data):
     db.session.add(song)
     db.session.commit()
 
-    get_songs()
+    if broadcast:
+        get_songs()
 
 
 @socketio.on("create_song")
-def create_song(data):
+def create_song(data, broadcast=True):
     band = get_band()
     name = data.get("name")
     if not name:
@@ -516,16 +518,27 @@ def create_song(data):
     db.session.add(song)
     db.session.commit()
 
-    get_songs()
+    if broadcast:
+        get_songs()
 
 
 @socketio.on("batch")
 def batch(data):
+    broadcast = data.get('broadcast', True)
     for req in data.get('requests', []):
         cmd = req.get("cmd")
         arg = req.get("arg")
         if cmd == "create_song":
-            create_song(arg)
+            create_song(arg, broadcast=False)
+        elif cmd == "create_tag":
+            create_tag(arg, broadcast=False)
+        elif cmd == "save_song":
+            save_song(arg, broadcast=False)
+        elif cmd == "add_song":
+            add_playlist_item(arg, broadcast=False)
+
+    if broadcast:
+        get_songs()
 
 
 # Error handlers

@@ -27,6 +27,12 @@ function initApplication() {
         usedSongs: [],
         songlistFetched: false,
         playlistsFetched: false,
+
+        tagFilters: new Map(),
+        tagFilterCombine: "OR",
+        tagFilterAdvanced: false,
+        gateStates: new Map(),
+        allTags: new Map(),
         /*socket_auth: {
             auth: {
                 band: null,
@@ -196,64 +202,156 @@ function initApplication() {
         );
     }
 
-    function songlist_update(msg) {
-        document.getElementById('song-list').innerHTML = "";
-        //document.getElementById('tag-filter-active').textContent = "";
-        const tag_filter = document.getElementById('tag-filter-list');
-        const all_tags = [];
+    function parseTag(rawTag) {
+        if (rawTag.startsWith('!')) {
+            return { name: rawTag.slice(1), defaultOff: true, advancedOnly: false, raw: rawTag };
+        }
+        if (rawTag.startsWith('#')) {
+            return { name: rawTag.slice(1), defaultOff: false, advancedOnly: true, raw: rawTag };
+        }
+        return { name: rawTag, defaultOff: false, advancedOnly: false, raw: rawTag };
+    }
 
-        function add_tag(tag) {
-            if (all_tags.indexOf(tag) == -1) {
-                all_tags.push(tag);
+    function renderGates() {
+        const container = document.getElementById('tag-filter-gates');
+        container.innerHTML = '';
 
-                const tmpl = document.getElementById("tagfilter-template").content.cloneNode(true);
-                const ti = tmpl.querySelector('.tag-filter-item');
-                ti.textContent = tag;
-                if (tag == "NOT") {
-                    ti.dataset.tagType = "NOT";
-                } else {
-                    ti.dataset.tagType = "";
-                }
-                tag_filter.appendChild(ti);
-            }
+        for (const [tagName, tagInfo] of state.allTags) {
+            if (!tagInfo.defaultOff) continue;
+
+            const tmpl = document.getElementById('tag-filter-gate-template').content.cloneNode(true);
+            const gate = tmpl.querySelector('.tag-filter-gate');
+            gate.dataset.tag = tagName;
+            gate.querySelector('.tag-filter-gate-name').textContent = tagName;
+
+            const isOpen = state.gateStates.get(tagName) || false;
+            applyGateState(gate, isOpen);
+
+            container.appendChild(gate);
         }
 
-        state.songlist = new Map(msg.items.map(s => Array(s.id, s)));
+        document.getElementById('tag-filter-gates-section')
+            .classList.toggle('d-none', container.children.length === 0);
+    }
+
+    function applyGateState(gate, isOpen) {
+        const indicator = gate.querySelector('.tag-filter-gate-indicator');
+        gate.classList.toggle('btn-primary', isOpen);
+        gate.classList.toggle('btn-outline-secondary', !isOpen);
+        indicator.classList.toggle('bi-eye-slash-fill', isOpen);
+        indicator.classList.toggle('bi-eye-slash', !isOpen);
+    }
+
+    function addFilterChip(tag, mode) {
+        state.tagFilters.set(tag, mode);
+
+        const tagInfo = state.allTags.get(tag);
+        const tmpl = document.getElementById('tag-filter-chip-template').content.cloneNode(true);
+        const chip = tmpl.querySelector('.tag-filter-chip');
+        chip.dataset.tag = tag;
+        if (tagInfo && tagInfo.advancedOnly) {
+            const icon = document.createElement('i');
+            icon.className = 'bi bi-eye-fill me-1 tag-chip-icon';
+            chip.prepend(icon);
+        }
+        chip.querySelector('.tag-filter-chip-name').textContent = tag;
+        applyChipMode(chip, mode);
+
+        document.getElementById('tag-filter-chips').appendChild(chip);
+        renderAvailableTags();
+        filterSongs();
+    }
+
+    function applyChipMode(chip, mode) {
+        const isIncluded = mode === 'include';
+        chip.classList.toggle('btn-success', isIncluded);
+        chip.classList.toggle('btn-danger', !isIncluded);
+        chip.querySelector('.tag-filter-chip-toggle').innerHTML =
+            isIncluded ? '<i class="bi bi-check-lg"></i>' : '<i class="bi bi-x-lg"></i>';
+    }
+
+    function renderAvailableTags() {
+        const container = document.getElementById('tag-filter-available');
+        container.innerHTML = '';
+
+        for (const [tagName, tagInfo] of state.allTags) {
+            if (tagInfo.defaultOff) continue;
+            if (tagInfo.advancedOnly && !state.tagFilterAdvanced) continue;
+            if (state.tagFilters.has(tagName)) continue;
+
+            const tmpl = document.getElementById('tag-filter-available-template').content.cloneNode(true);
+            const btn = tmpl.querySelector('.tag-filter-available');
+            btn.dataset.tag = tagName;
+            btn.textContent = tagName;
+            if (tagInfo.advancedOnly) {
+                const icon = document.createElement('i');
+                icon.className = 'bi bi-eye me-1';
+                btn.prepend(icon);
+            }
+            container.appendChild(btn);
+        }
+    }
+
+    function songlist_update(msg) {
+        document.getElementById('song-list').innerHTML = "";
+
+        state.songlist = new Map();
+        state.allTags = new Map();
+
+        msg.items.forEach(item => {
+            const parsedTags = item.tags.map(t => parseTag(t));
+            const song = Object.assign({}, item, {
+                rawTags: item.tags,
+                tags: parsedTags.map(t => t.name),
+            });
+            state.songlist.set(item.id, song);
+
+            parsedTags.forEach(pt => {
+                if (!state.allTags.has(pt.name)) {
+                    state.allTags.set(pt.name, { defaultOff: pt.defaultOff, advancedOnly: pt.advancedOnly });
+                }
+            });
+        });
+
+        // Store raw tag list for edit modal
         state.tags = msg.tags;
 
-        tag_filter.innerHTML = "";
+        msg.items.forEach(item => {
+            const tmpl = document.getElementById("songlist-item-template").content.cloneNode(true);
+            const pi = tmpl.querySelector('.songlist-item');
 
-        ["NOT"].forEach(item => add_tag(item));
+            pi.dataset.songId = item.id;
+            pi.dataset.songName = item.name;
+            pi.dataset.songBpm = item.bpm;
+            songlist_update_used_item(pi);
 
-        msg.items.forEach(
-            item => {
-                const tmpl = document.getElementById("songlist-item-template").content.cloneNode(true);
-                const pi = tmpl.querySelector('.songlist-item');
+            pi.querySelector('.songlist-item-name').textContent = item.name;
+            pi.querySelector('.songlist-item-meta').textContent =
+                (item.user_id ? item.user_id + ' \u00B7 ' : '') +
+                (item.bpm ? 'BPM: ' + item.bpm + ' \u00B7 ' : '');
 
-                pi.dataset.songId = item.id;
-                pi.dataset.songName = item.name;
-                pi.dataset.songBpm = item.bpm;
-                songlist_update_used_item(pi);
-
-                pi.querySelector('.songlist-item-name').textContent = item.name;
-                pi.querySelector('.songlist-item-meta').textContent =
-                    (item.user_id ? item.user_id + ' · ' : '') +
-                    (item.bpm ? 'BPM: ' + item.bpm + ' · ' : '');
-
-                item.tags.forEach(
-                    tag => {
-                        const tag_tmpl = document.getElementById("tagfilter-template").content.cloneNode(true);
-                        const tag_item = tag_tmpl.querySelector('.tag-filter-item');
-                        tag_item.textContent = tag;
-                        pi.querySelector('.songlist-item-tags').appendChild(tag_item);
-                        add_tag(tag);
+            item.tags.forEach(tag => {
+                const parsed = parseTag(tag);
+                const tag_tmpl = document.getElementById("songlist-tag-template").content.cloneNode(true);
+                const tag_item = tag_tmpl.querySelector('.songlist-item-tag');
+                tag_item.textContent = parsed.name;
+                if (parsed.defaultOff) {
+                    tag_item.classList.add('bi', 'bi-eye-slash');
+                }
+                if (parsed.advancedOnly) {
+                    tag_item.classList.add('tag-advanced-only', 'bi', 'bi-eye');
+                    if (!state.tagFilterAdvanced) {
+                        tag_item.classList.add('d-none');
                     }
-                );
+                }
+                pi.querySelector('.songlist-item-tags').appendChild(tag_item);
+            });
 
-                document.getElementById('song-list').appendChild(pi);
-            }
-        );
+            document.getElementById('song-list').appendChild(pi);
+        });
 
+        renderGates();
+        renderAvailableTags();
         edit_song_update_tags(state.songlist.get(state.edit_song_id));
         update_songlist_panel_edit();
         livelist_update_song_items();
@@ -386,10 +484,77 @@ function initApplication() {
         document.getElementById('livelist-delete-selected').addEventListener('click', handle_livelist_delete_selected);
         document.getElementById('edit-song-tag-create').addEventListener('click', handle_editsong_tag_create);
 
+        document.getElementById('tag-filter-and').addEventListener('click', () => {
+            state.tagFilterCombine = 'AND';
+            document.getElementById('tag-filter-and').classList.add('active');
+            document.getElementById('tag-filter-or').classList.remove('active');
+            filterSongs();
+        });
+        document.getElementById('tag-filter-or').addEventListener('click', () => {
+            state.tagFilterCombine = 'OR';
+            document.getElementById('tag-filter-or').classList.add('active');
+            document.getElementById('tag-filter-and').classList.remove('active');
+            filterSongs();
+        });
+        document.getElementById('tag-filter-advanced-toggle').addEventListener('click', () => {
+            if (document.getElementById('tag-filter').classList.contains('d-none')) {
+                toggleTagPanel(true);
+            }
+
+            state.tagFilterAdvanced = !state.tagFilterAdvanced;
+            document.getElementById('tag-filter-advanced').classList.toggle('d-none', !state.tagFilterAdvanced);
+            const btn = document.getElementById('tag-filter-advanced-toggle');
+            btn.classList.toggle('btn-outline-primary', !state.tagFilterAdvanced);
+            btn.classList.toggle('btn-primary', state.tagFilterAdvanced);
+            renderAvailableTags();
+
+            document.querySelectorAll('.tag-advanced-only').forEach(el => {
+                el.classList.toggle('d-none', !state.tagFilterAdvanced);
+            });
+        });
+        document.getElementById('edit-song-tag-toggle').addEventListener('click', (e) => {
+            const input = document.getElementById('edit-song-tag');
+            const btn = e.currentTarget;
+            const iconEl = btn.querySelector('i');
+            const prefixes = ['', '!', '#'];
+            const icons = ['bi-dash', 'bi-eye-slash', 'bi-eye'];
+            const currentPrefix = input.value.startsWith('!') ? '!' : input.value.startsWith('#') ? '#' : '';
+            const currentIndex = prefixes.indexOf(currentPrefix);
+            const nextIndex = (currentIndex + 1) % prefixes.length;
+            const nextPrefix = prefixes[nextIndex];
+
+            // Remove current prefix from input
+            if (currentPrefix && input.value.startsWith(currentPrefix)) {
+                input.value = input.value.slice(currentPrefix.length);
+            }
+            // Insert next prefix
+            if (nextPrefix) {
+                input.value = nextPrefix + input.value;
+            }
+
+            // Update icon
+            icons.forEach(cls => iconEl.classList.remove(cls));
+            iconEl.classList.add(icons[nextIndex]);
+            btn.classList.toggle('btn-outline-secondary', nextIndex === 0);
+            btn.classList.toggle('btn-primary', nextIndex !== 0);
+            input.focus();
+        });
+
+        function toggleTagPanel(open) {
+            const panel = document.getElementById('tag-filter');
+            const btn = document.getElementById('tag-filter-btn');
+            if (open === undefined) {
+                open = panel.classList.contains('d-none');
+            }
+            panel.classList.toggle('d-none', !open);
+            btn.classList.toggle('btn-outline-primary', !open);
+            btn.classList.toggle('btn-primary', open);
+            btn.classList.toggle('bi-tags', !open);
+            btn.classList.toggle('bi-tags-fill', open);
+        }
+
         function handle_tag_filter_btn(ev) {
-            document.getElementById('tag-filter').classList.toggle('d-none');
-            document.getElementById('tag-filter-btn').classList.toggle('bi-tags');
-            document.getElementById('tag-filter-btn').classList.toggle('bi-tags-fill');
+            toggleTagPanel();
         }
         function handle_livelist_item_number(pi, itemId) {
             if (state.selection.includes(itemId)) {
@@ -460,8 +625,34 @@ function initApplication() {
         }
 
         function handle_editsong_tag_create(ev) {
-            const tagName = document.getElementById("edit-song-tag").value;
-            state.socket.emit("create_tag", {name: tagName});
+            const toggleBtn = document.getElementById('edit-song-tag-toggle');
+            let tagName = document.getElementById('edit-song-tag').value.trim();
+            if (!tagName) return;
+
+            // Add tag to song data so save_song includes it
+            if (state.edit_song_id != null) {
+                const song = state.songlist.get(state.edit_song_id);
+                if (song && !song.rawTags.includes(tagName)) {
+                    song.rawTags.push(tagName);
+                    song.tags.push(parseTag(tagName).name);
+                }
+            }
+
+            state.socket.emit('batch', {
+                requests: [
+                    { cmd: 'create_tag', arg: { name: tagName } },
+                    { cmd: 'save_song', arg: {
+                        id: state.edit_song_id,
+                        name: document.getElementById('edit-song-name').value,
+                        bpm: document.getElementById('edit-song-bpm').value,
+                        tags: state.songlist.get(state.edit_song_id).rawTags,
+                    }},
+                ]
+            });
+            document.getElementById('edit-song-tag').value = '';
+            const toggleIcon = toggleBtn.querySelector('i');
+            toggleIcon.className = 'bi bi-dash';
+            toggleBtn.classList.replace('btn-primary', 'btn-outline-secondary');
         }
 
         function handle_songlist_create_song(ev) {
@@ -478,7 +669,9 @@ function initApplication() {
             const livelist_item = target.closest(".livelist-item");
             const songlist_item = target.closest(".songlist-item");
             const playlist_item = target.closest(".playlist-item");
-            const tag_filter_item = target.closest(".tag-filter-item");
+            const tag_filter_gate = target.closest(".tag-filter-gate");
+            const tag_filter_chip = target.closest(".tag-filter-chip");
+            const tag_filter_available = target.closest(".tag-filter-available");
             const songlist_item_tag = target.closest(".songlist-item-tag");
 
             if (livelist_item) {
@@ -494,52 +687,37 @@ function initApplication() {
                 const song = state.songlist.get(state.edit_song_id);
                 songlist_item_tag.classList.toggle("btn-outline-primary");
                 songlist_item_tag.classList.toggle("btn-primary");
+                const rawName = songlist_item_tag.dataset.name;
                 if (songlist_item_tag.classList.contains("btn-outline-primary")) {
-                    song.tags.splice(song.tags.indexOf(songlist_item_tag.dataset.name), 1);
+                    song.rawTags.splice(song.rawTags.indexOf(rawName), 1);
+                    song.tags.splice(song.tags.indexOf(parseTag(rawName).name), 1);
                 } else {
-                    song.tags.push(songlist_item_tag.dataset.name);
+                    song.rawTags.push(rawName);
+                    song.tags.push(parseTag(rawName).name);
                 }
-                song_save();
-            } else if (tag_filter_item) {
-                if (tag_filter_item.textContent == "NOT") {
-                    tag_filter_item.classList.toggle("btn-outline-primary");
-                    tag_filter_item.classList.toggle("btn-primary");
+                song_save_silent();
+            } else if (tag_filter_available) {
+                addFilterChip(tag_filter_available.dataset.tag, 'include');
+            } else if (tag_filter_gate) {
+                const tag = tag_filter_gate.dataset.tag;
+                const currentOpen = state.gateStates.get(tag) || false;
+                state.gateStates.set(tag, !currentOpen);
+                applyGateState(tag_filter_gate, !currentOpen);
+                filterSongs();
+            } else if (tag_filter_chip) {
+                const tag = tag_filter_chip.dataset.tag;
+
+                if (target.closest('.tag-filter-chip-remove')) {
+                    state.tagFilters.delete(tag);
+                    tag_filter_chip.remove();
                 } else {
-                    const tag_filter_list = tag_filter_item.closest('#tag-filter-list');
-                    const tag_not = tag_filter_list.querySelector('button[data-tag-type="NOT"]');
-                    if (tag_filter_item.classList.contains("btn-outline-primary")) {
-                        if (tag_not.classList.contains("btn-primary")) {
-                            tag_filter_item.classList.toggle("btn-outline-primary");
-                            tag_filter_item.classList.toggle("btn-danger");
-
-                        } else {
-                            tag_filter_item.classList.toggle("btn-outline-primary");
-                            tag_filter_item.classList.toggle("btn-success");
-                        }
-                    } else {
-                        tag_filter_item.classList.toggle("btn-outline-primary");
-                        tag_filter_item.classList.toggle("btn-success", false);
-                        tag_filter_item.classList.toggle("btn-danger", false);
-                    }
-                    tag_not.classList.toggle("btn-primary", false);
-                    tag_not.classList.toggle("btn-outline-primary", true);
-
-                    /*
-                    const tag_filter_active = document.getElementById('tag-filter-active');
-                    const tag_filter_list = tag_filter_item.closest('#tag-filter-list');
-                    if (tag_filter_list != null) {
-                        const ti = tag_filter_item.cloneNode(true);
-                        if (tag_filter_list.querySelector('button[data-tag-type="NOT"]').classList.contains("btn-outline-primary")) {
-                    //tag_filter_item.classList.toggle("btn-outline-primary");
-                            ti.classList.add("text-decoration-line-through");
-                        }
-                        tag_filter_active.appendChild(ti);
-                    } else {
-                        tag_filter_active.removeChild(tag_filter_item);
-                    }*/
-
-                    filterSongs();
+                    const current = state.tagFilters.get(tag);
+                    const next = current === 'include' ? 'exclude' : 'include';
+                    state.tagFilters.set(tag, next);
+                    applyChipMode(tag_filter_chip, next);
                 }
+                renderAvailableTags();
+                filterSongs();
             } else if (target.classList.contains("clipboard-copy-set")) {
                 let str = "";
                 state.playlist.items.forEach(
@@ -634,11 +812,18 @@ function initApplication() {
         tagedit.textContent = "";
         state.tags.forEach(
             item => {
-                const tag_tmpl = document.getElementById("songlist-tag-template").content.cloneNode(true);
+                const parsed = parseTag(item);
+                const tag_tmpl = document.getElementById("edit-song-tag-template").content.cloneNode(true);
                 const tag_item = tag_tmpl.querySelector('.songlist-item-tag');
-                tag_item.textContent = item;
+                tag_item.textContent = parsed.name;
                 tag_item.dataset.name = item;
-                if (song != null && song.tags.indexOf(item) >= 0) {
+                if (parsed.defaultOff) {
+                    tag_item.classList.add('bi', 'bi-eye-slash');
+                }
+                if (parsed.advancedOnly) {
+                    tag_item.classList.add('bi', 'bi-eye');
+                }
+                if (song != null && song.rawTags.indexOf(item) >= 0) {
                     tag_item.classList.toggle("btn-primary");
                     tag_item.classList.toggle("btn-outline-primary");
                 }
@@ -648,16 +833,20 @@ function initApplication() {
     }
 
     function song_save() {
+        song_save_silent();
+        bootstrap.Modal.getInstance(document.getElementById('edit-song-modal')).hide();
+    }
+
+    function song_save_silent() {
         const id = parseInt(document.getElementById('edit-song-id').value);
         const data = {
             id: id,
             name: document.getElementById('edit-song-name').value,
             bpm: document.getElementById('edit-song-bpm').value,
-            tags: state.songlist.get(id).tags,
+            tags: state.songlist.get(id).rawTags,
         }
 
         state.socket.emit("save_song", data);
-        bootstrap.Modal.getInstance(document.getElementById('edit-song-modal')).hide();
     }
 
     function addSongToPlaylist(id) {
@@ -721,6 +910,36 @@ function initApplication() {
         document.querySelectorAll(".songlist-mode-add").forEach(item => item.classList.toggle("d-none", mode));
     }
 
+    function songIsVisible(songId) {
+        const song = state.songlist.get(songId);
+        const songTags = song.tags;
+
+        // Layer 1: Gate check - hide songs with closed default-off tags
+        for (const [tagName, tagInfo] of state.allTags) {
+            if (!tagInfo.defaultOff) continue;
+            if (!songTags.includes(tagName)) continue;
+            if (!state.gateStates.get(tagName)) return false;
+        }
+
+        // Layer 2: Exclude chips
+        for (const [tag, mode] of state.tagFilters) {
+            if (mode === 'exclude' && songTags.includes(tag)) return false;
+        }
+
+        // Layer 2: Include chips
+        const includes = [];
+        for (const [tag, mode] of state.tagFilters) {
+            if (mode === 'include') includes.push(tag);
+        }
+        if (includes.length === 0) return true;
+
+        if (state.tagFilterCombine === 'AND') {
+            return includes.every(t => songTags.includes(t));
+        } else {
+            return includes.some(t => songTags.includes(t));
+        }
+    }
+
     function filterSongs() {
         const nummap = {
             '1': "^\n",
@@ -744,44 +963,11 @@ function initApplication() {
         const re = new RegExp(res, "i");
         const el = document.getElementsByClassName("songlist-item");
 
-        function songInActiveTags(id) {
-            const tfa = document.getElementById('tag-filter-list');
-            const songTags = state.songlist.get(id).tags;
-            var empty = true;
-            var inlist = false;
-            tfa.querySelectorAll(".btn-danger").forEach(
-                item => {
-                    //empty = false;
-                    if (songTags.indexOf(item.textContent) >= 0) {
-                        inlist = true;
-                    }
-                }
-            );
-            if (inlist)
-                return false;
-
-            empty = true;
-            tfa.querySelectorAll(".btn-success").forEach(
-                item => {
-                    empty = false;
-                    if (songTags.indexOf(item.textContent) >= 0) {
-                        inlist = true;
-                    }
-                }
-            );
-            if (inlist)
-                return true;
-            return empty;
-        }
-        Array.from(el).forEach(
-            (e) => {
-                if (re.test(e.dataset.songName) && songInActiveTags(parseInt(e.dataset.songId))) {
-                    e.classList.remove("d-none");
-                } else {
-                    e.classList.add("d-none");
-                }
-            }
-        );
+        Array.from(el).forEach(e => {
+            const textMatch = re.test(e.dataset.songName);
+            const tagMatch = songIsVisible(parseInt(e.dataset.songId));
+            e.classList.toggle("d-none", !(textMatch && tagMatch));
+        });
     }
 
     function sortSongs(sortBy) {

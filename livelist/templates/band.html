@@ -55,7 +55,49 @@
 
 
 <template id="songlist-tag-template">
-    <small class="songlist-item-tag badge btn btn-sm btn-outline-primary text-muted gap-1 tag-item"></small>
+    <small class="songlist-item-tag badge btn btn-outline-primary text-muted gap-1 py-1 px-2 tag-item"></small>
+</template>
+
+<template id="edit-song-tag-template">
+    <small class="songlist-item-tag badge btn btn-outline-primary text-muted gap-1 py-2 px-3 tag-item"></small>
+</template>
+
+<template id="tag-filter-gate-template">
+    <button class="badge btn btn-outline-secondary gap-1 py-2 px-3 tag-filter-gate">
+        <i class="tag-filter-gate-indicator bi bi-eye-slash"></i>
+        <span class="tag-filter-gate-name"></span>
+    </button>
+</template>
+
+<template id="tag-filter-available-template">
+    <button class="badge btn btn-outline-primary mx-1 py-2 px-3 tag-filter-available"></button>
+</template>
+
+<template id="tag-filter-chip-template">
+    <button class="badge btn gap-1 py-2 px-3 tag-filter-chip">
+        <span class="tag-filter-chip-name"></span>
+        <span class="tag-filter-chip-toggle ms-1"></span>
+        <span class="tag-filter-chip-remove ms-1"><i class="bi bi-x-lg"></i></span>
+    </button>
+</template>
+
+<template id="tag-filter-gate-template">
+    <button class="badge btn btn-sm btn-outline-secondary gap-1 tag-filter-gate">
+        <i class="tag-filter-gate-indicator bi bi-eye-slash"></i>
+        <span class="tag-filter-gate-name"></span>
+    </button>
+</template>
+
+<template id="tag-filter-available-template">
+    <button class="badge btn btn-sm btn-outline-primary mx-1 tag-filter-available"></button>
+</template>
+
+<template id="tag-filter-chip-template">
+    <button class="badge btn btn-sm gap-1 tag-filter-chip">
+        <span class="tag-filter-chip-name"></span>
+        <span class="tag-filter-chip-toggle ms-1"></span>
+        <span class="tag-filter-chip-remove ms-1"><i class="bi bi-x-lg"></i></span>
+    </button>
 </template>
 
 
@@ -168,25 +210,29 @@
                 <button class="btn btn-sm btn-outline-primary bi bi-sort-alpha-down" id="sort-alpha">A-Z</button>
                 <button class="btn btn-sm btn-outline-primary bi bi-sort-numeric-down" id="sort-bpm">BPM</button>
                 <button class="btn btn-sm btn-outline-primary bi bi-sort-down" id="sort-id">ID</button>
-                <button class="btn btn-sm btn-outline-primary bi bi-tags" id="tag-filter-btn">Tags</button>
-                <div class="flex-grow-1 d-none">
-                    <select class="form-select form-select-sm" id="xtag-filter">
-                        <option value="">All Tags</option>
-                        <!-- Tags will be populated by JavaScript -->
-                    </select>
+                <div class="btn-group btn-group-sm">
+                    <button class="btn btn-outline-primary bi bi-tags" id="tag-filter-btn">Tags</button>
+                    <button class="btn btn-outline-primary bi bi-gear" id="tag-filter-advanced-toggle"></button>
                 </div>
 
             </div>
 
-            <template id="tagfilter-template">
-                <button class="badge btn btn-sm btn-outline-primary mx-1 tag-filter-item"></button>
-            </template>
             <div class="d-none" id="tag-filter">
-                <div class="w-100 gap-2" id="tag-filter-list"></div>
-                <!--
-                <hr/>
-                <div class="w-100 gap-2" id="tag-filter-active"></div>
-                -->
+                <div class="d-flex flex-wrap gap-1 mb-2" id="tag-filter-available"></div>
+
+                <div class="d-flex flex-wrap gap-1 mb-2" id="tag-filter-chips"></div>
+
+                <div class="d-none" id="tag-filter-advanced">
+                    <hr class="my-2" />
+                    <div class="mb-2" id="tag-filter-gates-section">
+                        <small class="text-muted">Hidden songs</small>
+                        <div class="d-flex flex-wrap gap-1 mt-1" id="tag-filter-gates"></div>
+                    </div>
+                    <div class="btn-group btn-group-sm mb-2">
+                        <button class="btn btn-outline-secondary" id="tag-filter-and">AND</button>
+                        <button class="btn btn-outline-secondary active" id="tag-filter-or">OR</button>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -271,6 +317,9 @@
                     <label for="edit-song-tag" class="form-label">Tags</label>
                     <div id="edit-song-tags" class="gap-1 pb-2"></div>
                     <div class="mb-3 input-group">
+                        <button type="button" class="btn btn-outline-secondary" id="edit-song-tag-toggle"
+                            title="Tag prefix: none / ! (hidden songs) / # (advanced only)"><i
+                                class="bi bi-dash"></i></button>
                         <input type="text" class="form-control" id="edit-song-tag" required>
                         <button type="button" class="btn btn-primary bi bi-plus" id="edit-song-tag-create"></button>
                     </div>

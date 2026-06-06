@@ -5,6 +5,7 @@ function initApplication() {
 
     Object.assign(state, {
         editMode: false,
+        moveMode: false,
         selectedItems: new Set(),
         socket: socket,
 
@@ -146,32 +147,43 @@ function initApplication() {
         livelist_update_item_numbers();
         livelist_update_playing_item(msg.active_item_id);
         songlist_update_used_items(msg.items);
-        update_edit_mode();
+        update_mode();
     }
 
     function livelist_update_item_numbers() {
-        document.querySelectorAll(".livelist-item").forEach(
-            item => item.querySelectorAll(".livelist-item-selectbox").forEach(subitem => {
-                const pos = state.selection.indexOf(parseInt(item.dataset.itemId));
-                    subitem.innerHTML = pos >= 0 ? ("&nbsp;" + String(pos + 1)) : "";
-                    subitem.classList.toggle("btn-outline-warning", pos == -1);
-                    subitem.classList.toggle("btn-warning", pos != -1);
-                }
-            )
-        );
+        document.querySelectorAll(".livelist-item").forEach(item => {
+            const itemId = parseInt(item.dataset.itemId);
+            const pos = state.selection.indexOf(itemId);
+            const selectbox = item.querySelector(".livelist-item-selectbox");
+            const position = item.querySelector(".livelist-item-position");
+
+            if (selectbox) {
+                selectbox.textContent = pos >= 0 ? String(pos + 1) : "";
+                selectbox.classList.toggle('btn-outline-warning', pos == -1);
+                selectbox.classList.toggle('btn-warning', pos != -1);
+                selectbox.classList.toggle('d-none', !state.editMode || pos == -1);
+            }
+
+            if (position) {
+                position.classList.toggle('d-none', state.editMode && pos != -1);
+                position.classList.toggle('btn-primary', !state.editMode);
+                position.classList.toggle('btn-outline-primary', state.editMode);
+            }
+        });
     }
 
-    function livelist_item_set_anchor(pi, user_action=false) {
+    function livelist_item_set_anchor(pi, user_action = false) {
         if (state.anchorItem) {
             state.anchorItem.querySelector(".livelist-item-anchor").classList.add("d-none");
         }
-        if (pi == state.anchorItem && user_action) {
+        if (pi == state.anchorItem && user_action && pi != null) {
             state.anchorItemSticky = !state.anchorItemSticky;
         }
 
         let ai_el;
         state.anchorItem = pi;
         if (state.anchorItem == null) {
+            state.anchorItemSticky = false;
             ai_el = document.getElementById("livelist-header-anchor");
             ai_el.classList.remove("d-none");
         } else {
@@ -179,9 +191,22 @@ function initApplication() {
             ai_el = pi.querySelector(".livelist-item-anchor");
             ai_el.classList.remove("d-none");
         }
+
+        // Update anchor direction indicators
+        const dirDown = ai_el?.querySelector('.anchor-dir-down');
+        const dirUp = ai_el?.querySelector('.anchor-dir-up');
+        if (dirDown && dirUp) {
+            dirDown.classList.toggle('d-none', state.anchorItemSticky);
+            dirUp.classList.toggle('d-none', !state.anchorItemSticky);
+        }
+
+        // Sticky indicator styling
         if (ai_el != null) {
             ai_el.classList.toggle("btn-outline-primary", state.anchorItemSticky);
         }
+
+        // Update move-to-anchor button visibility
+        update_move_to_anchor_visibility();
     }
 
     /* Songlist */
@@ -454,7 +479,9 @@ function initApplication() {
     }
 
     function setupEventListeners() {
-        document.getElementById('toggle-edit')?.addEventListener('click', toggleEditMode);
+        document.getElementById('mode-play')?.addEventListener('click', () => setViewMode('play'));
+        document.getElementById('mode-move')?.addEventListener('click', () => setViewMode('move'));
+        document.getElementById('mode-edit')?.addEventListener('click', () => setViewMode('edit'));
 
         document.querySelectorAll('.keypad-btn').forEach(btn => {
             btn.addEventListener('click', handleKeypadButton);
@@ -560,26 +587,18 @@ function initApplication() {
             if (state.selection.includes(itemId)) {
                 const index = state.selection.indexOf(itemId);
                 state.selection.splice(index, 1);
-
-                pi.querySelector(".livelist-item-selectbox").textContent = "";
-
                 pi.classList.toggle("list-group-item-warning", false);
             } else {
                 state.selection.push(itemId);
                 pi.classList.toggle("list-group-item-warning", true);
             }
 
-            state.editMode = state.selection.length != 0;
-            update_edit_mode();
-
-            //document.querySelectorAll(".livelist-item.list-group-item-warning").forEach(
+            // Don't auto-toggle editMode — mode is controlled by mode toggle
             livelist_update_item_numbers();
         }
 
         function handle_livelist_item_select(pi) {
-            if (true || state.editMode == false) {
-                livelist_item_set_anchor(pi, true);
-            }
+            livelist_item_set_anchor(pi, true);
         }
 
         function handle_livelist_delete_selected(e) {
@@ -592,10 +611,14 @@ function initApplication() {
                 on_livelist_item_play(itemId);
             } else if (target.classList.contains("livelist-item-delete")) {
                 on_livelist_item_delete(itemId);
+            } else if (target.classList.contains('livelist-item-move-to-anchor')) {
+                handle_move_to_anchor(itemId);
             } else if (target.classList.contains('livelist-item-selectbox')) {
                 handle_livelist_item_number(livelist_item, itemId);
             } else if (target.classList.contains('livelist-item-position')) {
-                handle_livelist_item_number(livelist_item, itemId);
+                if (state.editMode) {
+                    handle_livelist_item_number(livelist_item, itemId);
+                }
             } else {
                 handle_livelist_item_select(livelist_item);
             }
@@ -733,42 +756,125 @@ function initApplication() {
         });
     }
 
-    function toggleEditMode() {
-        state.editMode = !state.editMode;
-        state.selection.length = 0;
-        livelist_update_item_numbers();
+    function setViewMode(mode) {
+        const prevMode = state.editMode ? 'edit' : (state.moveMode ? 'move' : 'play');
+        if (mode === prevMode) return;
 
-        if (!state.editMode) {
+        state.moveMode = (mode === 'move');
+        state.editMode = (mode === 'edit');
+
+        // Clear selection when leaving edit mode
+        if (mode !== 'edit') {
+            state.selection.length = 0;
             document.querySelectorAll(".livelist-item.list-group-item-warning").forEach(
-                item => {
-                    item.classList.toggle("list-group-item-warning", false);
-                }
+                item => item.classList.toggle("list-group-item-warning", false)
             );
         }
-        update_edit_mode();
+        livelist_update_item_numbers();
+        update_mode();
     }
 
-    function update_edit_mode() {
-        const editButtons = document.querySelectorAll('.livelist-item-delete, .livelist-item-selectbox');
+    function update_move_to_anchor_visibility() {
+        const mode = state.editMode ? 'edit' : (state.moveMode ? 'move' : 'play');
+        document.querySelectorAll('.livelist-item-move-to-anchor').forEach(btn => {
+            const item = btn.closest('.livelist-item');
+            const isAnchor = item === state.anchorItem;
+            btn.classList.toggle('d-none', mode !== 'move' || isAnchor);
+        });
+    }
 
-        editButtons.forEach(btn => {
-            btn.classList.toggle('d-none', !state.editMode);
+    function update_mode() {
+        const mode = state.editMode ? 'edit' : (state.moveMode ? 'move' : 'play');
+
+        // Grip icons (right side): Move mode only
+        document.querySelectorAll('.livelist-item-grip').forEach(el => {
+            el.classList.toggle('d-none', mode !== 'move');
         });
 
-        document.querySelectorAll('.livelist-item-positions').forEach(btn => {
-            btn.classList.toggle('btn-group', state.editMode);
-        });
-        document.querySelectorAll('.livelist-item-btn-group-right').forEach(btn => {
-            btn.classList.toggle('btn-group', state.editMode);
+        // Delete buttons: Edit mode only
+        document.querySelectorAll('.livelist-item-delete').forEach(btn => {
+            btn.classList.toggle('d-none', mode !== 'edit');
         });
 
-        // Update button text
-        const toggleEditBtn = document.getElementById('toggle-edit');
-        toggleEditBtn.textContent = state.editMode ? 'Done' : 'Edit';
-        toggleEditBtn.classList.toggle('btn-outline-primary', !state.editMode);
-        toggleEditBtn.classList.toggle('btn-success', state.editMode);
-        document.getElementById('nav-main').classList.toggle("d-none", state.editMode);
-        document.getElementById('nav-edit').classList.toggle("d-none", !state.editMode);
+        // Select checkbox / position visibility is handled by livelist_update_item_numbers()
+
+        // Play buttons: Play mode only
+        document.querySelectorAll('.livelist-item-play').forEach(btn => {
+            btn.classList.toggle('d-none', mode !== 'play');
+        });
+
+        // Move-to-anchor: Move mode, non-anchor items
+        update_move_to_anchor_visibility();
+
+        // Right button group styling
+        document.querySelectorAll('.livelist-item-btn-group-right').forEach(el => {
+            el.classList.toggle('btn-group', mode !== 'play');
+        });
+
+        // Navbar mode toggle buttons
+        const modePlay = document.getElementById('mode-play');
+        const modeMove = document.getElementById('mode-move');
+        const modeEdit = document.getElementById('mode-edit');
+
+        [modePlay, modeMove, modeEdit].forEach(btn => {
+            btn.classList.remove('btn-primary', 'btn-outline-primary');
+        });
+
+        if (mode === 'play') {
+            modePlay.classList.add('btn-primary');
+            modeMove.classList.add('btn-outline-primary');
+            modeEdit.classList.add('btn-outline-primary');
+        } else if (mode === 'move') {
+            modePlay.classList.add('btn-outline-primary');
+            modeMove.classList.add('btn-primary');
+            modeEdit.classList.add('btn-outline-primary');
+        } else {
+            modePlay.classList.add('btn-outline-primary');
+            modeMove.classList.add('btn-outline-primary');
+            modeEdit.classList.add('btn-primary');
+        }
+
+        // Apply mode class to livelist for CSS targeting
+        const livelistEl = document.getElementById('livelist');
+        livelistEl?.classList.toggle('mode-play', mode === 'play');
+        livelistEl?.classList.toggle('mode-move', mode === 'move');
+        livelistEl?.classList.toggle('mode-edit', mode === 'edit');
+
+        // Nav sections: main nav visible in Play + Move, edit nav in Edit
+        document.getElementById('nav-main').classList.toggle('d-none', mode === 'edit');
+        document.getElementById('nav-edit').classList.toggle('d-none', mode !== 'edit');
+    }
+
+    function handle_move_to_anchor(itemId) {
+        const ai = state.anchorItem;
+        if (!ai) {
+            // Move to top (before first item)
+            const firstItem = document.querySelectorAll('.livelist-item')[0];
+            if (firstItem) {
+                const msg = {
+                    moved_ids: [itemId],
+                    target_id: parseInt(firstItem.dataset.itemId),
+                    before: true,
+                    playlist_id: state.currentPlaylist,
+                };
+                handle_drag_and_drop(msg);
+            }
+            return;
+        }
+
+        const msg = {
+            moved_ids: [itemId],
+            target_id: parseInt(ai.dataset.itemId),
+            before: state.anchorItemSticky,
+            playlist_id: state.currentPlaylist,
+        };
+
+        // Anchor advancement for non-sticky mode (same as add_song)
+        if (!state.anchorItemSticky) {
+            state.lastAction = "add_song";
+        }
+
+        handle_drag_and_drop(msg);
     }
 
     function on_livelist_item_play(pid) {

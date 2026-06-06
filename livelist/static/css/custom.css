@@ -7,16 +7,43 @@
 }
 
 .drag-handle {
-    cursor: grab;
     touch-action: none;
+}
+
+.mode-move .drag-handle {
+    cursor: grab;
 }
 
 .drag-handle:hover {
     opacity: 1;
 }
 
-.drag-handle:active {
+.mode-move .drag-handle:active {
     cursor: grabbing;
+}
+
+/* Grip icon in right button group */
+.livelist-item-grip {
+    color: var(--bs-secondary-color);
+}
+
+/* Position number and selectbox sizing */
+.livelist-item-position,
+.livelist-item-selectbox {
+    min-width: 3.0em;
+    text-align: center;
+}
+
+/* Anchor direction indicators */
+.anchor-dir-down,
+.anchor-dir-up {
+    font-size: 0.65em;
+    vertical-align: middle;
+}
+
+/* Move-to-anchor button */
+.livelist-item-move-to-anchor {
+    color: var(--bs-primary);
 }
 
 .container-fluid {
@@ -44,11 +71,6 @@
 
 .livelist-item {
     box-sizing: border-box;
-}
-
-.livelist-item-position,
-.livelist-item-selectbox {
-    min-width: 3.0em;
 }
 
 .livelist-item.list-group-item.drag-over {

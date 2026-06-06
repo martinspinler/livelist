@@ -22,6 +22,9 @@ function initDragAndDrop(s, handle_drag_and_drop) {
     livelist.addEventListener('pointerdown', onPointerDown);
 
     function onPointerDown(e) {
+        // Only allow drag in Move mode
+        if (!state.moveMode) return;
+
         const handle = e.target.closest('.drag-handle');
         if (!handle) return;
 

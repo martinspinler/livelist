@@ -351,6 +351,19 @@ function initApplication() {
         }
     }
 
+    function scroll_to_active_or_anchor() {
+        let target = null;
+        if (state.activeItem != null) {
+            target = document.querySelector(`.livelist-item[data-item-id="${state.activeItem}"]`);
+        }
+        if (!target && state.anchorItem != null) {
+            target = state.anchorItem;
+        }
+        if (target) {
+            target.scrollIntoView({block: 'center', behavior: 'instant'});
+        }
+    }
+
     function toggleSetCollapse(setKey) {
         const isCollapsed = state.collapsedSets.has(setKey);
         if (isCollapsed) {
@@ -612,6 +625,8 @@ function initApplication() {
 
         const qry = `.playlist-btn-select[data-playlist-id="${msg.playlist_id}"]`;
         document.querySelector(qry)?.classList.add("active");
+
+        scroll_to_active_or_anchor();
     }
 
     function playlist_update_active_item(item) {

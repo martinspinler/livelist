@@ -27,6 +27,17 @@ The central area showing the current playlist as an ordered, numbered list of so
   - Delete selected items in bulk
   - Update item order explicitly
 
+#### Set Breaks
+
+Break/pause items divide a playlist into sets. Every playlist starts with a "Set 1" header, and additional breaks can be inserted to create further sets (Set 2, Set 3, …). All set headers are uniform: they show the set label, song count, collapse chevron, copy-to-clipboard button, and anchor icon.
+
+- **Add Break** — Click the "Add Break" button in the Song Library panel to insert a set separator after the current anchor position
+- **Set header** — Each set displays: label (e.g. "Set 1"), song count, copy-to-clipboard button (📋), collapse toggle (▾)
+- **Collapse** — Click the chevron on any set header to collapse/expand the songs in that set (including Set 1)
+- **Anchor** — Click a set header or its ⚓ icon to set the anchor at that position (inserts before the first song of that set)
+- **Reorder/Delete** — In move mode, break items have drag handles; in edit mode, they show delete buttons (Set 1 cannot be deleted)
+- **Navigation** — Prev/next playback automatically skips over break items; break items cannot be played
+
 #### Anchor System
 
 The anchor (⚓) determines where new songs are inserted and where items are moved when using "move to anchor". It has two states, toggled by clicking the anchor item:
@@ -34,7 +45,7 @@ The anchor (⚓) determines where new songs are inserted and where items are mov
 - **Non-sticky** (⚓↓) — Items are inserted/moved *after* the anchor, then the anchor advances past the new item. Enables sequential workflow.
 - **Sticky** (⚓↑) — Items are inserted/moved *before* the anchor, and the anchor stays in place. Enables accumulating items at a fixed position.
 
-Click the playlist header ("Set 1") to move the anchor to the top (insert before the first item).
+Click any set header or the ⚓ icon on Set 1 to move the anchor to the top (insert before the first item). Clicking any other break header sets the anchor to the first song in that set.
 
 ### Song Library (Left Offcanvas Panel)
 
@@ -47,6 +58,7 @@ A searchable, filterable catalog of all songs in the band's library.
   - **Advanced toggle** — Show/hide advanced filter options:
     - **Gate controls** — Mark certain tags as "gated" (hidden by default) with eye indicators
     - **AND/OR logic** — Switch between intersective (AND) and union (OR) filter modes
+- **Add Break** — Insert a set separator into the current playlist at the anchor position
 - **Add to playlist** — Click a song to add it to the current playlist; in edit mode, click to insert at a specific position relative to the selected item
 - **Pin panel** — Pin the offcanvas panel open instead of auto-closing
 - **Edit mode** — Switch the library to edit mode to:
@@ -76,7 +88,7 @@ Bands authenticate via a simple password stored per-band. The auth state is kept
 | **Song** | A song in the band's library — name, BPM, user identifier (`user_id`), tags, optional file reference and JSON metadata |
 | **Tag** | Labels for filtering songs (e.g. genre, mood). Tags are per-band and many-to-many with songs |
 | **Playlist** | A dated setlist belonging to a band — tracks an `active_item_id` for the currently playing song |
-| **PlaylistItem** | A song placed at a specific position within a playlist |
+| **PlaylistItem** | A song or break placed at a specific position within a playlist. Break items have `song_id = null` and `meta.is_break = true` |
 
 ## Additional Views
 
@@ -114,3 +126,17 @@ flask create-band <name> <addr> <password>
 # Start the server
 python -m livelist.server
 ```
+
+### Existing Databases
+
+If you have an existing database, the `items` table needs the `song_id` column made nullable (break items have no song reference). Apply this SQL:
+
+```sql
+-- SQLite
+ALTER TABLE items RENAME COLUMN song_id TO song_id_old;
+ALTER TABLE items ADD COLUMN song_id INTEGER REFERENCES songs(id);
+UPDATE items SET song_id = song_id_old;
+DROP TABLE IF EXISTS _items_backup;  -- cleanup if needed
+```
+
+Or simply recreate the database with `flask init-db` if data loss is acceptable.

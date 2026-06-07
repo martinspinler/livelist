@@ -131,8 +131,8 @@ class PlaylistItem(Base):
     playlist_id: Mapped[int] = mapped_column(ForeignKey("playlists.id"))
     playlist: Mapped["Playlist"] = relationship("Playlist", back_populates="items")
 
-    song_id: Mapped[int] = mapped_column(ForeignKey("songs.id"))
-    song: Mapped["Song"] = relationship("Song", back_populates="playlist_items")
+    song_id: Mapped[Optional[int]] = mapped_column(ForeignKey("songs.id"), nullable=True)
+    song: Mapped[Optional["Song"]] = relationship("Song", back_populates="playlist_items")
 
     position: Mapped[int] = mapped_column(Integer)
     meta: Mapped[Optional[str]] = mapped_column(Text)  # JSON string for item-specific metadata

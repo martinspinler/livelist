@@ -281,7 +281,7 @@ class SyncLivelistClient(PlaylistClient):
         pli = {
             v["id"]: PlaylistItem(
                 id=v["id"],
-                song=self.songlist.get(int(v["song_id"])),
+                song=self.songlist.get(int(v["song_id"])) if v.get("song_id") is not None else None,
                 pos=i,
                 **{k: val for k, val in v.items() if k in extra_fields},
             )

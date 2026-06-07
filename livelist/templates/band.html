@@ -19,7 +19,6 @@
                 <small class="playlist-item-date text-muted"></small>
                 <small class="text-muted"> · </small>
                 <small class="playlist-item-songcount text-muted"></small>
-                <small class="text-muted"> songs</small>
             </div>
 
             <div>
@@ -48,7 +47,7 @@
             <span class="anchor-icon">⚓</span><i class="bi bi-arrow-down anchor-dir-down ms-1"></i><i
                 class="bi bi-arrow-up anchor-dir-up ms-1 d-none"></i>
         </span>
-        <div class="btn-group xbtn-group-sm livelist-item-btn-group-right">
+        <div class="livelist-item-btn-group-right">
             <button class="btn bi bi-box-arrow-right livelist-item-move-to-anchor d-none"
                 title="Move to anchor"></button>
             <span class="btn bi bi-grip-vertical livelist-item-grip drag-handle d-none"></span>
@@ -58,6 +57,27 @@
     </li>
 </template>
 
+<template id="livelist-break-template">
+    <li class="livelist-break list-group-item d-flex align-items-center gap-2 py-2">
+        <div class="d-flex align-items-center gap-2 flex-grow-1">
+            <button class="btn bi bi-chevron-down livelist-break-collapse" title="Collapse set"></button>
+            <span class="fw-bold livelist-break-label">Set 2</span>
+            <small class="text-muted livelist-break-songcount"></small>
+            <small class="text-muted livelist-break-duration d-none"></small>
+        </div>
+        <span class="btn livelist-item-anchor d-none" aria-label="Anchor">
+            <span class="anchor-icon">⚓</span><i class="bi bi-arrow-down anchor-dir-down ms-1"></i><i
+                class="bi bi-arrow-up anchor-dir-up ms-1 d-none"></i>
+        </span>
+        <div class="livelist-break-btn-group-right">
+            <button class="btn bi bi-box-arrow-right livelist-break-move-to-anchor d-none"
+                title="Move to anchor"></button>
+            <span class="btn bi bi-grip-vertical livelist-break-grip drag-handle d-none"></span>
+            <button class="btn btn-outline-danger bi bi-trash livelist-break-delete d-none" title="Delete break"></button>
+            <button class="btn btn-outline-primary bi bi-clipboard clipboard-copy-break-set d-none" title="Copy set"></button>
+        </div>
+    </li>
+</template>
 
 <template id="songlist-tag-template">
     <small class="songlist-item-tag badge btn btn-outline-primary text-muted gap-1 py-1 px-2 tag-item"></small>
@@ -168,21 +188,6 @@
 <div class="container-fluid">
     <!-- Current Playlist Header -->
     <div class="card mb-3 mt-3">
-        <div class="card-header list-group-item-action d-flex justify-content-between align-items-center"
-            id="livelist-header">
-            <div class="mb-0">
-                <span id="playlist-set-name">Set 1</span>
-            </div>
-            <div class="btn-group">
-                <span class="btn livelist-item-anchor" id="livelist-header-anchor" aria-label="Anchor">
-                    <span class="anchor-icon">⚓</span><i class="bi bi-arrow-down anchor-dir-down ms-1"></i><i
-                        class="bi bi-arrow-up anchor-dir-up ms-1 d-none"></i>
-                </span>
-                <button class="btn xbtn-sm btn-outline-primary bi bi-copy clipboard-copy-set"></button>
-                <button class="btn d-none"></button>
-            </div>
-        </div>
-
         <!-- Livelist -->
         <div class="card-body p-0" id="livelist">
             <ul class="list-group list-group-flush" id="livelist-items">
@@ -257,6 +262,9 @@
                 </div>
             </div>
         </div>
+
+        <!-- Add Break button -->
+        <button class="btn btn-outline-secondary w-100 mb-2 bi bi-dash-lg" id="btn-add-break">Add Break</button>
 
         <!-- Song list -->
         <div id="song-list-container">

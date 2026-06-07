@@ -35,6 +35,12 @@ class PlaylistItem:
     id: int
     song: Optional[Song] = None
     pos: int = 0
+    meta: Optional[Dict] = None
+
+    @property
+    def is_break(self) -> bool:
+        """True if this item is a set break/separator (no song)."""
+        return self.meta is not None and self.meta.get("is_break", False)
 
 
 @dataclass
@@ -47,3 +53,5 @@ class PlaylistInfo:
     band_id: Optional[int] = None
     active_item_id: Optional[int] = None
     item_count: int = 0
+    song_count: int = 0
+    set_count: int = 1

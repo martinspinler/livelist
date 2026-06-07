@@ -79,6 +79,7 @@ def get_playlist_items(playlist: Playlist):
                 "id": item.id,
                 "song_id": item.song_id,
                 "position": item.position,
+                "meta": json.loads(item.meta) if item.meta else None,
             } for item in items
         ],
     }
@@ -157,6 +158,8 @@ def get_band_playlists(band):
                 "band_id": p.band_id,
                 "active_item_id": p.active_item_id,
                 "item_count": len(p.items),
+                "song_count": sum(1 for i in p.items if i.song_id is not None),
+                "set_count": sum(1 for i in p.items if i.meta and json.loads(i.meta).get("is_break")) + 1,
             }
             for p in playlists
         ]
@@ -217,10 +220,20 @@ def handle_play_item(data: dict):
             .filter_by(playlist_id=playlist_id, position=pos)
             .first()
         )
+        # Skip break items during navigation
+        while item and item.meta and json.loads(item.meta).get("is_break"):
+            pos += (1 if off > 0 else -1)
+            item = (
+                db.session.query(PlaylistItem)
+                .filter_by(playlist_id=playlist_id, position=pos)
+                .first()
+            )
         item_id = None if item is None else item.id
 
     item = db.session.query(PlaylistItem).get(item_id)
     if item and item.playlist_id != playlist_id:
+        return
+    if item and item.meta and json.loads(item.meta).get("is_break"):
         return
 
     playlist.active_item_id = item_id
@@ -275,6 +288,46 @@ def add_playlist_item(data, broadcast=True):
             moved_ids=[item.id],
         )
         # handle_playlist_update is called inside
+        on_move(data)
+    else:
+        handle_playlist_update({"playlist_id": playlist_id})
+
+
+@socketio.on("add_break")
+def add_break(data, broadcast=True):
+    """Add a break/pause separator to a playlist"""
+    band = get_band()
+    playlist = get_playlist(band, data)
+    playlist_id = playlist.id
+
+    target_id = data.get("target_id")
+    before = data.get("before", False)
+
+    label = data.get("label")
+
+    last_item = (
+        db.session.query(PlaylistItem)
+        .filter_by(playlist_id=playlist_id)
+        .order_by(PlaylistItem.position.desc())
+        .first()
+    )
+    position = last_item.position + 1 if last_item else 0
+
+    meta_dict = {"is_break": True}
+    if label:
+        meta_dict["label"] = label
+    item = PlaylistItem(playlist_id=playlist_id, song_id=None, position=position, meta=json.dumps(meta_dict))
+
+    db.session.add(item)
+    db.session.commit()
+
+    if target_id:
+        data = dict(
+            playlist_id=playlist_id,
+            before=before,
+            target_id=target_id,
+            moved_ids=[item.id],
+        )
         on_move(data)
     else:
         handle_playlist_update({"playlist_id": playlist_id})

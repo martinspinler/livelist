@@ -95,11 +95,6 @@
     background-color: rgb(from var(--bs-list-group-active-bg) r g b / 50%)
 }
 
-#livelist-header {
-    padding-top: 0.3em;
-    padding-bottom: 0.3em;
-}
-
 .livelist-item {
     box-sizing: border-box;
 }
@@ -136,6 +131,55 @@
     background-color: rgba(25, 135, 84, 0.2);
     box-shadow: inset 4px 0px rgba(25, 135, 84, 0.8);
 }
+
+/* Break item styling */
+.livelist-break {
+    box-sizing: border-box;
+    transition: background-color 0.2s;
+    background-color: var(--bs-card-cap-bg, rgba(0, 0, 0, 0.03));
+}
+
+.livelist-break.drag-over {
+    box-shadow: inset 2px 2px 0px #0d6efd,
+        inset -2px -2px 0px #0d6efd;
+}
+
+.livelist-break.drag-before {
+    box-shadow: inset 2px 7px 0px #0d6efd,
+        inset -2px -2px 0px #0d6efd;
+}
+
+.livelist-break.drag-after {
+    box-shadow: inset 2px 2px 0px #0d6efd,
+        inset -2px -7px 0px #0d6efd;
+}
+
+.livelist-break.dragging {
+    opacity: 0.5;
+    background-color: rgba(0, 0, 0, 0.1);
+}
+
+.mode-move .livelist-break .drag-handle {
+    cursor: grab;
+}
+
+.mode-move .livelist-break .drag-handle:active {
+    cursor: grabbing;
+}
+
+.mode-move .livelist-break .set1-grip-disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+/* Set 1 delete button — disabled placeholder so anchor aligns with other set headers */
+.livelist-break .set1-delete-disabled {
+    opacity: 0.15;
+    pointer-events: none;
+    cursor: default;
+}
+
 
 /* Song list styling */
 .song-item.selected {

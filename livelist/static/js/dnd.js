@@ -28,7 +28,7 @@ function initDragAndDrop(s, handle_drag_and_drop) {
         const handle = e.target.closest('.drag-handle');
         if (!handle) return;
 
-        const item = handle.closest('.livelist-item');
+        const item = handle.closest('.livelist-item, .livelist-break');
         if (!item) return;
 
         draggedItem = item;
@@ -82,7 +82,7 @@ function initDragAndDrop(s, handle_drag_and_drop) {
 
         if (!targetEl) return;
 
-        const targetItem = targetEl.closest('.livelist-item');
+        const targetItem = targetEl.closest('.livelist-item, .livelist-break');
         if (!targetItem || targetItem === draggedItem) return;
 
         targetItem.classList.add('drag-over');
@@ -211,7 +211,7 @@ function initDragAndDrop(s, handle_drag_and_drop) {
             const targetEl = document.elementFromPoint(e.clientX, e.clientY);
             draggedItem.style.display = '';
 
-            const targetItem = targetEl ? targetEl.closest('.livelist-item') : null;
+            const targetItem = targetEl ? targetEl.closest('.livelist-item, .livelist-break') : null;
 
             if (targetItem && draggedItem !== targetItem) {
                 const draggedPliId = draggedItem.dataset.itemId;
@@ -235,7 +235,7 @@ function initDragAndDrop(s, handle_drag_and_drop) {
     }
 
     function clearDragClasses() {
-        livelist.querySelectorAll('.livelist-item').forEach(item => {
+        livelist.querySelectorAll('.livelist-item, .livelist-break').forEach(item => {
             item.classList.remove('drag-over', 'drag-before', 'drag-after');
         });
     }

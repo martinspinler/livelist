@@ -34,6 +34,8 @@ function initApplication() {
         tagFilterAdvanced: false,
         gateStates: new Map(),
         allTags: new Map(),
+
+        collapsedSets: new Set(),
         /*socket_auth: {
             auth: {
                 band: null,
@@ -80,6 +82,10 @@ function initApplication() {
         old_ie.forEach(item => {
             item.classList.remove('playing');
         });
+        // Also clear any stale playing state from break items (should not happen)
+        document.querySelectorAll('.livelist-break').forEach(item => {
+            item.classList.remove('playing');
+        });
         new_ie?.classList.add('playing');
 
         old_e.forEach(item => {
@@ -99,25 +105,118 @@ function initApplication() {
         const prevAnchor = state.anchorItem;
 
         list_e.innerHTML = "";
+
+        // Pre-scan: count breaks to assign set numbers and song counts per set
+        const SET1_KEY = "__set1__";
+        let tempSetNum = 1;
+        let tempCount = 0;
+        const breakSetMap = {};   // break item id -> set number
+        const setSongCounts = {}; // set number -> song count
+
+        msg.items.forEach(item => {
+            if (item.meta && item.meta.is_break) {
+                setSongCounts[tempSetNum] = tempCount;
+                tempSetNum++;
+                breakSetMap[item.id] = tempSetNum;
+                tempCount = 0;
+            } else {
+                tempCount++;
+            }
+        });
+        setSongCounts[tempSetNum] = tempCount;
+
+        // Render virtual Set 1 header
+        const set1tmpl = document.getElementById("livelist-break-template").content.cloneNode(true);
+        const set1_e = set1tmpl.querySelector('.livelist-break');
+        set1_e.dataset.setKey = SET1_KEY;
+        set1_e.querySelector('.livelist-break-label').textContent = "Set 1";
+        set1_e.querySelector('.livelist-break-songcount').textContent =
+            setSongCounts[1] + (setSongCounts[1] === 1 ? " song" : " songs");
+
+        // Collapse state for Set 1
+        const set1Collapsed = state.collapsedSets.has(SET1_KEY);
+        set1_e.querySelector('.livelist-break-collapse').classList.toggle('bi-chevron-down', !set1Collapsed);
+        set1_e.querySelector('.livelist-break-collapse').classList.toggle('bi-chevron-right', set1Collapsed);
+
+        // Drag handle for Set 1: visible in move mode but disabled (can't drag virtual header)
+        // Move-to-anchor is not applicable to Set 1
+        set1_e.querySelector('.drag-handle')?.classList.add('set1-grip-disabled');
+        set1_e.querySelector('.livelist-break-delete')?.classList.add('set1-delete-disabled');
+        set1_e.querySelector('.livelist-break-move-to-anchor')?.remove();
+
+        // Show anchor on Set 1 if anchorItem points to this element (from previous render)
+        if (state.anchorItem != null && state.anchorItem.dataset.setKey === SET1_KEY) {
+            set1_e.querySelector('.livelist-item-anchor').classList.remove('d-none');
+        }
+
+        list_e.appendChild(set1_e);
+
+        // Second pass: render items
+        let setNumber = 1;
+        let currentBreakId = SET1_KEY; // Set 1 is the current "break" until a real break appears
+        let songIndex = 0;
+
         msg.items.forEach(
             item => {
-                /* TODO: 'Break' item should create <div class="card-header">*/
-                const tmpl = document.getElementById("livelist-item-template").content.cloneNode(true);
-                const item_e = tmpl.querySelector('.livelist-item');
-                //const song = item.song;
-                const song = state.songlist.get(item.song_id)
-                item_e.dataset.itemId = item.id;
-                item_e.dataset.songId = item.song_id;
-                item_e.querySelector('.song-name').textContent = song.name;
-                item_e.querySelector('.song-tags').textContent = song.tags.join(",");
-                item_e.querySelector('.song-user_id').textContent =
-                    (song.user_id ? song.user_id + ' - ' : '') + (song.notes || '');
-                item_e.querySelector('.livelist-item-position').textContent = item.position + 1;
+                if (item.meta && item.meta.is_break) {
+                    // Render break separator
+                    setNumber = breakSetMap[item.id];
+                    currentBreakId = item.id;
 
-                list_e.appendChild(item_e);
+                    const tmpl = document.getElementById("livelist-break-template").content.cloneNode(true);
+                    const break_e = tmpl.querySelector('.livelist-break');
+                    break_e.dataset.itemId = item.id;
+                    break_e.dataset.isBreak = "true";
 
-                if (prevAnchor != null && item.id == prevAnchor.dataset.itemId) {
-                    state.anchorItem = item_e;
+                    const label = item.meta.label || ("Set " + setNumber);
+                    break_e.querySelector('.livelist-break-label').textContent = label;
+                    break_e.querySelector('.livelist-break-songcount').textContent =
+                        setSongCounts[setNumber] + (setSongCounts[setNumber] === 1 ? " song" : " songs");
+
+                    // Collapse state
+                    const isCollapsed = state.collapsedSets.has(item.id);
+                    const collapseBtn = break_e.querySelector('.livelist-break-collapse');
+                    collapseBtn.classList.toggle('bi-chevron-down', !isCollapsed);
+                    collapseBtn.classList.toggle('bi-chevron-right', isCollapsed);
+
+                    // Delete button visibility in edit mode
+                    break_e.querySelector('.livelist-break-delete').classList.toggle('d-none', !state.editMode);
+
+                    // Restore anchor if this break was the anchor
+                    if (prevAnchor != null && prevAnchor.dataset.isBreak && item.id == prevAnchor.dataset.itemId) {
+                        break_e.querySelector('.livelist-item-anchor').classList.remove('d-none');
+                        state.anchorItem = break_e;
+                    }
+
+                    list_e.appendChild(break_e);
+                } else {
+                    // Render regular song item
+                    const tmpl = document.getElementById("livelist-item-template").content.cloneNode(true);
+                    const item_e = tmpl.querySelector('.livelist-item');
+                    const song = state.songlist.get(item.song_id);
+                    item_e.dataset.itemId = item.id;
+                    item_e.dataset.songId = item.song_id;
+                    item_e.dataset.setNumber = setNumber;
+
+                    if (song) {
+                        item_e.querySelector('.song-name').textContent = song.name;
+                        item_e.querySelector('.song-tags').textContent = song.tags.join(",");
+                        item_e.querySelector('.song-user_id').textContent =
+                            (song.user_id ? song.user_id + ' - ' : '') + (song.notes || '');
+                    }
+                    item_e.querySelector('.livelist-item-position').textContent = songIndex + 1;
+
+                    // Hide if parent set is collapsed
+                    if (currentBreakId && state.collapsedSets.has(currentBreakId)) {
+                        item_e.classList.add('d-none');
+                    }
+
+                    list_e.appendChild(item_e);
+                    songIndex++;
+
+                    if (prevAnchor != null && item.id == prevAnchor.dataset.itemId) {
+                        state.anchorItem = item_e;
+                    }
                 }
             }
         );
@@ -137,7 +236,12 @@ function initApplication() {
                 if (ai == null) {
                     ai = document.querySelectorAll('.livelist-item')[0];
                 } else {
-                    ai = ai.nextSibling;
+                    // Skip past break elements when advancing anchor
+                    let next = ai.nextElementSibling;
+                    while (next && !next.classList.contains('livelist-item')) {
+                        next = next.nextElementSibling;
+                    }
+                    ai = next;
                 }
             }
             state.lastAction = null;
@@ -174,22 +278,24 @@ function initApplication() {
 
     function livelist_item_set_anchor(pi, user_action = false) {
         if (state.anchorItem) {
-            state.anchorItem.querySelector(".livelist-item-anchor").classList.add("d-none");
+            state.anchorItem.querySelector(".livelist-item-anchor")?.classList.add("d-none");
         }
+
         if (pi == state.anchorItem && user_action && pi != null) {
-            state.anchorItemSticky = !state.anchorItemSticky;
+            // Set 1 anchor always uses non-sticky (below) behavior
+            if (!pi.dataset.setKey) {
+                state.anchorItemSticky = !state.anchorItemSticky;
+            }
+        } else if (pi != null && pi.dataset.setKey) {
+            // Setting anchor on Set 1 — force non-sticky
+            state.anchorItemSticky = false;
         }
 
         let ai_el;
         state.anchorItem = pi;
-        if (state.anchorItem == null) {
-            state.anchorItemSticky = false;
-            ai_el = document.getElementById("livelist-header-anchor");
-            ai_el.classList.remove("d-none");
-        } else {
-            document.getElementById("livelist-header-anchor").classList.add("d-none");
+        if (state.anchorItem != null) {
             ai_el = pi.querySelector(".livelist-item-anchor");
-            ai_el.classList.remove("d-none");
+            ai_el?.classList.remove("d-none");
         }
 
         // Update anchor direction indicators
@@ -221,9 +327,14 @@ function initApplication() {
         if (!posEl || !nameEl || !dirEl || !infoEl) return;
 
         if (state.anchorItem == null) {
-            posEl.textContent = '0';
-            nameEl.textContent = 'Top';
+            posEl.textContent = '';
+            nameEl.textContent = '';
             dirEl.className = 'bi bi-arrow-down';
+        } else if (state.anchorItem.classList.contains('livelist-break')) {
+            posEl.textContent = '';
+            const label = state.anchorItem.querySelector('.livelist-break-label');
+            nameEl.textContent = label ? label.textContent : '';
+            dirEl.className = state.anchorItemSticky ? 'bi bi-arrow-up' : 'bi bi-arrow-down';
         } else {
             const position = state.anchorItem.querySelector('.livelist-item-position');
             const name = state.anchorItem.querySelector('.song-name');
@@ -231,6 +342,62 @@ function initApplication() {
             nameEl.textContent = name ? name.textContent : '';
             dirEl.className = state.anchorItemSticky ? 'bi bi-arrow-up' : 'bi bi-arrow-down';
         }
+    }
+
+    function toggleSetCollapse(setKey) {
+        const isCollapsed = state.collapsedSets.has(setKey);
+        if (isCollapsed) {
+            state.collapsedSets.delete(setKey);
+        } else {
+            state.collapsedSets.add(setKey);
+        }
+
+        // Find the break element — either by setKey (virtual Set 1) or itemId (real breaks)
+        let breakEl;
+        if (setKey === "__set1__") {
+            breakEl = document.querySelector('.livelist-break[data-set-key="__set1__"]');
+        } else {
+            breakEl = document.querySelector(`.livelist-break[data-item-id="${setKey}"]`);
+        }
+        if (!breakEl) return;
+
+        let el = breakEl.nextElementSibling;
+        while (el && !el.classList.contains('livelist-break')) {
+            if (el.classList.contains('livelist-item')) {
+                el.classList.toggle('d-none', !isCollapsed); // if was collapsed, now show; if was shown, now hide
+            }
+            el = el.nextElementSibling;
+        }
+
+        // Update collapse button icon
+        const collapseBtn = breakEl.querySelector('.livelist-break-collapse');
+        collapseBtn.classList.toggle('bi-chevron-down', isCollapsed);
+        collapseBtn.classList.toggle('bi-chevron-right', !isCollapsed);
+    }
+
+    function copySetToClipboard(setKey) {
+        // Collect songs belonging to the set after this break
+        let str = "";
+        let breakEl;
+        if (setKey === "__set1__") {
+            breakEl = document.querySelector('.livelist-break[data-set-key="__set1__"]');
+        } else {
+            breakEl = document.querySelector(`.livelist-break[data-item-id="${setKey}"]`);
+        }
+        if (!breakEl) return;
+
+        let el = breakEl.nextElementSibling;
+        while (el && !el.classList.contains('livelist-break')) {
+            if (el.classList.contains('livelist-item')) {
+                const song = state.songlist.get(parseInt(el.dataset.songId));
+                if (song) {
+                    const pos = el.querySelector('.livelist-item-position');
+                    str += (pos ? pos.textContent : '') + ". " + song.name + "\n";
+                }
+            }
+            el = el.nextElementSibling;
+        }
+        navigator.clipboard.writeText(str);
     }
 
     /* Songlist */
@@ -245,6 +412,7 @@ function initApplication() {
         });
         items.forEach(
             item => {
+                if (!item.song_id) return; // skip break items
                 const qry = `.songlist-item[data-song-id="${item.song_id}"]`;
                 document.querySelector(qry)?.classList.add("active");
             }
@@ -419,7 +587,7 @@ function initApplication() {
         state.currentPlaylist = msg.playlist_id;
         state.activeItem = msg.active_item_id;
         state.anchorItem = null;
-        state.usedSongs = msg.items.map(item => item.song_id);
+        state.usedSongs = msg.items.filter(item => item.song_id).map(item => item.song_id);
 
         state.selection.length = 0;
 
@@ -463,7 +631,10 @@ function initApplication() {
                 pi.dataset.playlistId = item.id;
                 pi.querySelector('.playlist-item-name').textContent = item.name;
                 pi.querySelector('.playlist-item-date').textContent = item.date;
-                pi.querySelector('.playlist-item-songcount').textContent = item.item_count;
+                const sc = item.song_count != null ? item.song_count : item.item_count;
+                const sets = item.set_count != null ? item.set_count : 1;
+                pi.querySelector('.playlist-item-songcount').textContent =
+                    sets + ' set' + (sets !== 1 ? 's' : '') + ', ' + sc + ' song' + (sc !== 1 ? 's' : '');
 
                 pi.classList.toggle("active", item.id == state.currentPlaylist);
 
@@ -515,6 +686,7 @@ function initApplication() {
             document.getElementById('keypad-container').classList.toggle('d-none');
         });
         document.getElementById('songlist-song-create').addEventListener('click', handle_songlist_create_song);
+        document.getElementById('btn-add-break')?.addEventListener('click', addBreakToPlaylist);
 
         document.getElementById('song-filter').addEventListener('input', debounce(filterSongs, 200));
         document.getElementById('sort-alpha').addEventListener('click', () => sortSongs('alpha'));
@@ -714,6 +886,7 @@ function initApplication() {
             const target = e.target;
 
             const livelist_item = target.closest(".livelist-item");
+            const livelist_break = target.closest(".livelist-break");
             const songlist_item = target.closest(".songlist-item");
             const playlist_item = target.closest(".playlist-item");
             const tag_filter_gate = target.closest(".tag-filter-gate");
@@ -723,6 +896,24 @@ function initApplication() {
 
             if (livelist_item) {
                 handle_livelist_item_click(target, livelist_item, parseInt(livelist_item.dataset.itemId));
+            } else if (livelist_break) {
+                const breakId = parseInt(livelist_break.dataset.itemId);
+                const setKey = livelist_break.dataset.setKey;
+                if (target.closest('.livelist-break-collapse')) {
+                    toggleSetCollapse(setKey || breakId);
+                } else if (target.closest('.livelist-break-delete')) {
+                    state.socket.emit("delete_items", { playlist_id: state.currentPlaylist, item_ids: [breakId] });
+                } else if (target.closest('.livelist-break-move-to-anchor')) {
+                    if (breakId) {
+                        handle_move_to_anchor(breakId);
+                    }
+                } else if (target.closest('.clipboard-copy-break-set')) {
+                    copySetToClipboard(setKey || breakId);
+                    e.stopPropagation();
+                } else {
+                    // Clicking a break header sets the anchor on this break
+                    livelist_item_set_anchor(livelist_break, true);
+                }
             } else if (songlist_item) {
                 handle_songlist_item_click(target, songlist_item, parseInt(songlist_item.dataset.songId));
             } else if (playlist_item) {
@@ -765,17 +956,6 @@ function initApplication() {
                 }
                 renderAvailableTags();
                 filterSongs();
-            } else if (target.classList.contains("clipboard-copy-set")) {
-                let str = "";
-                state.playlist.items.forEach(
-                    item => {
-                        str += String(item.position + 1) + ". " + item.song.name + "\n";
-                    }
-                )
-                navigator.clipboard.writeText(str);
-                e.stopPropagation();
-            } else if (target.closest("#livelist-header")) {
-                livelist_item_set_anchor(null, true);
             }
         });
     }
@@ -800,9 +980,16 @@ function initApplication() {
 
     function update_move_to_anchor_visibility() {
         const mode = state.editMode ? 'edit' : (state.moveMode ? 'move' : 'play');
+        // Regular items
         document.querySelectorAll('.livelist-item-move-to-anchor').forEach(btn => {
             const item = btn.closest('.livelist-item');
             const isAnchor = item === state.anchorItem;
+            btn.classList.toggle('d-none', mode !== 'move' || isAnchor);
+        });
+        // Break items
+        document.querySelectorAll('.livelist-break-move-to-anchor').forEach(btn => {
+            const breakEl = btn.closest('.livelist-break');
+            const isAnchor = breakEl === state.anchorItem;
             btn.classList.toggle('d-none', mode !== 'move' || isAnchor);
         });
     }
@@ -815,8 +1002,18 @@ function initApplication() {
             el.classList.toggle('d-none', mode !== 'move');
         });
 
+        // Break grip handles: Move mode only (Set 1 shows as disabled via CSS)
+        document.querySelectorAll('.livelist-break .drag-handle').forEach(el => {
+            el.classList.toggle('d-none', mode !== 'move');
+        });
+
         // Delete buttons: Edit mode only
         document.querySelectorAll('.livelist-item-delete').forEach(btn => {
+            btn.classList.toggle('d-none', mode !== 'edit');
+        });
+
+        // Break delete buttons: Edit mode only
+        document.querySelectorAll('.livelist-break-delete').forEach(btn => {
             btn.classList.toggle('d-none', mode !== 'edit');
         });
 
@@ -827,12 +1024,23 @@ function initApplication() {
             btn.classList.toggle('d-none', mode !== 'play');
         });
 
+        // Break clipboard/copy buttons: Play mode only (replaces play button position)
+        document.querySelectorAll('.clipboard-copy-break-set').forEach(btn => {
+            btn.classList.toggle('d-none', mode !== 'play');
+        });
+
         // Move-to-anchor: Move mode, non-anchor items
         update_move_to_anchor_visibility();
 
-        // Right button group styling
+        // Right button group styling — btn-group only in move mode
+        // (play: single button with rounded edges; edit: single delete with rounded edges)
         document.querySelectorAll('.livelist-item-btn-group-right').forEach(el => {
-            el.classList.toggle('btn-group', mode !== 'play');
+            el.classList.toggle('btn-group', mode === 'move');
+        });
+
+        // Break right button group styling
+        document.querySelectorAll('.livelist-break-btn-group-right').forEach(el => {
+            el.classList.toggle('btn-group', mode === 'move');
         });
 
         // Navbar mode toggle buttons
@@ -886,10 +1094,32 @@ function initApplication() {
             return;
         }
 
+        let targetId;
+        let isBreakAnchor = false;
+        if (ai.dataset.setKey) {
+            // Virtual Set 1 anchor — move before first song
+            const firstItem = document.querySelectorAll('.livelist-item')[0];
+            if (firstItem) {
+                targetId = parseInt(firstItem.dataset.itemId);
+            }
+        } else if (ai.dataset.itemId && ai.classList.contains('livelist-break')) {
+            // Real break anchor — always insert after the break (= start of set)
+            targetId = parseInt(ai.dataset.itemId);
+            isBreakAnchor = true;
+        } else if (ai.dataset.itemId) {
+            targetId = parseInt(ai.dataset.itemId);
+        }
+
+        if (targetId == null) return;
+
+        // For break anchors, always insert after the break regardless of sticky state;
+        // for regular items, sticky inserts before, non-sticky inserts after.
+        const before = isBreakAnchor ? false : state.anchorItemSticky;
+
         const msg = {
             moved_ids: [itemId],
-            target_id: parseInt(ai.dataset.itemId),
-            before: state.anchorItemSticky,
+            target_id: targetId,
+            before: before,
             playlist_id: state.currentPlaylist,
         };
 
@@ -993,8 +1223,23 @@ function initApplication() {
             data.before = true;
         }
 
-        if (ai != null) {
+        if (ai != null && ai.dataset.itemId) {
             data.target_id = parseInt(ai.dataset.itemId);
+            // Break anchors always insert after the break (= start of that set)
+            // regardless of sticky state; regular items follow sticky semantics
+            if (ai.classList.contains('livelist-break')) {
+                data.before = false;
+            } else {
+                data.before = state.anchorItemSticky;
+            }
+        } else if (ai && ai.dataset.setKey) {
+            // Anchor on virtual Set 1 with no real itemId — insert before first song
+            let elms = document.querySelectorAll('.livelist-item');
+            let first = elms.length > 0 ? elms[0] : null;
+            if (first) {
+                data.target_id = parseInt(first.dataset.itemId);
+                data.before = true;
+            }
         }
         state.lastAction = "add_song";
         state.socket.emit("add_song", data);
@@ -1005,6 +1250,37 @@ function initApplication() {
         if (document.getElementById('songlist-panel-pin').classList.contains("bi-pin")) {
             bootstrap.Offcanvas.getInstance(document.getElementById('songlist-panel')).hide();
         }
+    }
+
+    function addBreakToPlaylist() {
+        const data = {
+            playlist_id: state.currentPlaylist,
+            before: false,
+        };
+
+        let ai = state.anchorItem;
+        if (ai == null) {
+            // No anchor — insert before the first real item
+            const firstItem = document.querySelector('#livelist-items .livelist-item, #livelist-items .livelist-break[data-item-id]');
+            if (firstItem && firstItem.dataset.itemId) {
+                data.target_id = parseInt(firstItem.dataset.itemId);
+                data.before = true;
+            }
+        } else if (ai.dataset.itemId) {
+            data.target_id = parseInt(ai.dataset.itemId);
+            if (ai.classList.contains('livelist-break')) {
+                data.before = state.anchorItemSticky;
+            }
+        } else if (ai.dataset.setKey) {
+            // Anchor on virtual Set 1 — insert before first song or break
+            const firstItem = document.querySelector('#livelist-items .livelist-item, #livelist-items .livelist-break[data-item-id]');
+            if (firstItem && firstItem.dataset.itemId) {
+                data.target_id = parseInt(firstItem.dataset.itemId);
+                data.before = true;
+            }
+        }
+
+        state.socket.emit("add_break", data);
     }
 
     function on_livelist_item_delete(id) {

@@ -99,6 +99,13 @@
     box-sizing: border-box;
 }
 
+.livelist-item.list-group-item.drag-before,
+.livelist-item.list-group-item.drag-after,
+.livelist-break.drag-before,
+.livelist-break.drag-after {
+    z-index: 2;
+}
+
 .livelist-item.list-group-item.drag-before::before,
 .livelist-break.drag-before::before {
     content: "";

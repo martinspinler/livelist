@@ -48,6 +48,13 @@ function initApplication() {
     setupSocketCallbacks();
     initDragAndDrop(state, handle_drag_and_drop);
 
+    // Use HTTP-bootstrapped data if available (from /api/init.js <script> tag)
+    if (window.__INIT__) {
+        songlist_update(window.__INIT__.songlist);
+        playlists_update(window.__INIT__.playlists);
+        if (window.__INIT__.playlist) playlist_select(window.__INIT__.playlist);
+    }
+
     window.addEventListener("DOMContentLoaded", function () {
         socket.emit("get_songlist", {});
         /* HOTFIX(synchronization): should emit "get_playlists" and "select_playlist",

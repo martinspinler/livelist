@@ -6,6 +6,7 @@
 <script type="text/javascript" src="{{ url_for('static', filename='js/socket.io.min.js') }}"></script>
 <script type="text/javascript" src="{{ url_for('static', filename='js/app.js') }}"></script>
 <script type="text/javascript" src="{{ url_for('static', filename='js/dnd.js') }}"></script>
+<script type="text/javascript" src="/api/init.js?band={{ band.addr }}&key={{ auth_key }}"></script>
 {% endblock %}
 
 {% block content %}

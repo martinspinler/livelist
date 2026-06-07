@@ -215,7 +215,7 @@ def view_band_noredirect(band):
         </script>
     """
     return render_template(
-        "band.html", band=band, playlist=playlist, date_today=date_today, jinja_script=jinja_script
+        "band.html", band=band, playlist=playlist, date_today=date_today, jinja_script=jinja_script, auth_key=key
     )
 
 

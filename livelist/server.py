@@ -42,6 +42,65 @@ socketio = SocketIO(
 app.register_blueprint(views_bp)
 
 
+@app.route("/api/init.js")
+def api_init():
+    """Bootstrap endpoint: return all initial data as a JS global variable.
+
+    Returns the same JSON structures that the WebSocket handlers emit,
+    so the client can render immediately without waiting for WS connect.
+    Auth is validated via query params (same credentials used for WS auth).
+    """
+    from flask import request as req
+    from .routes.views import get_privileges, get_default_playlist
+
+    band_addr = req.args.get("band")
+    key = req.args.get("key")
+    if not band_addr or get_privileges(band_addr, key) is None:
+        return "window.__INIT__ = null;", 200, {"Content-Type": "text/javascript"}
+
+    band = db.session.query(Band).filter_by(addr=band_addr).first()
+    if not band:
+        return "window.__INIT__ = null;", 200, {"Content-Type": "text/javascript"}
+
+    # Songlist (same serialization as get_songs handler)
+    songs = db.session.query(Song).filter_by(band_id=band.id).order_by(Song.name).all()
+    tags = db.session.query(Tag).filter_by(band_id=band.id).all()
+    songlist = {
+        "tags": [t.name for t in tags],
+        "items": [
+            {
+                "id": s.id,
+                "name": s.name,
+                "user_id": s.user_id,
+                "bpm": s.bpm,
+                "notes": s.notes,
+                "filename": s.filename,
+                "store": s.store,
+                "meta": json.loads(s.meta) if s.meta else None,
+                "tags": [tag.name for tag in s.tags],
+            }
+            for s in songs
+        ],
+    }
+
+    # Playlists (reuses existing function)
+    playlists = get_band_playlists_data(band)
+
+    # Current playlist items (if active/default playlist exists)
+    playlist = get_default_playlist(band)
+    playlist_data = get_playlist_items(playlist) if playlist else None
+
+    init_data = {
+        "songlist": songlist,
+        "playlists": playlists,
+        "playlist": playlist_data,
+    }
+
+    js = f"window.__INIT__ = {json.dumps(init_data)};"
+    js = js.replace("</", "<\\/")  # prevent closing </script> in HTML
+    return js, 200, {"Content-Type": "text/javascript"}
+
+
 def get_band() -> Band:
     """get current band based on session variable (authentised) """
 
@@ -138,10 +197,8 @@ def handle_activate_playlist(data: dict):
     emit("playlist_activated", {"playlist_id": playlist.id}, to=f'band_{band.id}')
 
 
-def get_band_playlists(band):
-    """Get all playlists for a band"""
-    band = get_band()
-
+def get_band_playlists_data(band):
+    """Get all playlists for a band (pure data function, no session dependency)"""
     playlists = (
         db.session.query(Playlist)
         .filter_by(band_id=band.id)
@@ -149,27 +206,25 @@ def get_band_playlists(band):
         .order_by(Playlist.id.desc())
         .all()
     )
-    res = (
-        [
-            {
-                "id": p.id,
-                "name": p.name,
-                "date": p.date.isoformat(),
-                "band_id": p.band_id,
-                "active_item_id": p.active_item_id,
-                "item_count": len(p.items),
-                "song_count": sum(1 for i in p.items if i.song_id is not None),
-                "set_count": sum(1 for i in p.items if i.meta and json.loads(i.meta).get("is_break")) + 1,
-            }
-            for p in playlists
-        ]
-    )
+    res = [
+        {
+            "id": p.id,
+            "name": p.name,
+            "date": p.date.isoformat(),
+            "band_id": p.band_id,
+            "active_item_id": p.active_item_id,
+            "item_count": len(p.items),
+            "song_count": sum(1 for i in p.items if i.song_id is not None),
+            "set_count": sum(1 for i in p.items if i.meta and json.loads(i.meta).get("is_break")) + 1,
+        }
+        for p in playlists
+    ]
     return res
 
 
 @socketio.on("get_playlists")
 def on_get_band_playlists(data):
-    res = get_band_playlists(get_band())
+    res = get_band_playlists_data(get_band())
     emit("playlists", res)
 
 
@@ -424,7 +479,7 @@ def create_playlist(data):
     db.session.add(playlist)
     db.session.commit()
 
-    res = get_band_playlists(band)
+    res = get_band_playlists_data(band)
     emit("playlists", res, to=f'band_{band.id}')
 
     res = get_playlist_items(playlist)
@@ -439,7 +494,7 @@ def on_delete_playlist(data):
     db.session.delete(playlist)
     db.session.commit()
 
-    res = get_band_playlists(band)
+    res = get_band_playlists_data(band)
 
     emit("playlists", res)
     emit("playlists", res, to=f'band_{band.id}', include_self=False)
@@ -461,7 +516,7 @@ def on_save_playlist(data):
     db.session.add(playlist)
     db.session.commit()
 
-    res = get_band_playlists(band)
+    res = get_band_playlists_data(band)
     emit("playlists", res, to=f'band_{band.id}')
 
     res = get_playlist_items(playlist)

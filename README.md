@@ -17,16 +17,24 @@ The main view is divided into three sections:
 
 ### Livelist (Main View)
 
-The central area showing the current playlist as an ordered, numbered list of songs.
+The central area showing the current playlist as an ordered, numbered list of songs. The view operates in three modes, toggled via the **Play / Move / Edit** button group in the navbar:
 
-- **Play** — Tap the play button on any item to mark it as the active song; the event is broadcast to all connected clients
-- **Navigation** — Previous/next navigation through the playlist
-- **Anchor** — Pin an item to keep it visually highlighted (⚓ icon) regardless of what is currently playing
-- **Edit mode** — Toggle edit mode to:
-  - Drag-and-drop reorder items
-  - Multi-select items and delete them in bulk
+- **Play mode** *(default)* — Performance mode. Tap the play button (▶) on any item to mark it as the active song; the event is broadcast to all connected clients. The anchor (⚓) is visible for adding songs at a specific position.
+- **Move mode** — Reorder mode. Each item shows a drag handle (≡) and a "move to anchor" button (→⚓) on the right side. Songs can be rearranged by:
+  - **Drag & Drop** — Drag the grip handle to reorder items directly
+  - **Move to anchor** — Click the →⚓ button to instantly move an item to the anchor position (one click instead of scrolling + dragging)
+- **Edit mode** — Management mode. Position numbers become clickable selection targets (outline style). Select multiple items to:
+  - Delete selected items in bulk
   - Update item order explicitly
-- **Drag & Drop** — Reorder songs by dragging grip handles (edit mode)
+
+#### Anchor System
+
+The anchor (⚓) determines where new songs are inserted and where items are moved when using "move to anchor". It has two states, toggled by clicking the anchor item:
+
+- **Non-sticky** (⚓↓) — Items are inserted/moved *after* the anchor, then the anchor advances past the new item. Enables sequential workflow.
+- **Sticky** (⚓↑) — Items are inserted/moved *before* the anchor, and the anchor stays in place. Enables accumulating items at a fixed position.
+
+Click the playlist header ("Set 1") to move the anchor to the top (insert before the first item).
 
 ### Song Library (Left Offcanvas Panel)
 

@@ -207,6 +207,30 @@ function initApplication() {
 
         // Update move-to-anchor button visibility
         update_move_to_anchor_visibility();
+
+        // Update navbar anchor info
+        update_anchor_info();
+    }
+
+    function update_anchor_info() {
+        const posEl = document.getElementById('anchor-info-pos');
+        const nameEl = document.getElementById('anchor-info-name');
+        const dirEl = document.getElementById('anchor-info-dir');
+        const infoEl = document.getElementById('anchor-info');
+
+        if (!posEl || !nameEl || !dirEl || !infoEl) return;
+
+        if (state.anchorItem == null) {
+            posEl.textContent = '0';
+            nameEl.textContent = 'Top';
+            dirEl.className = 'bi bi-arrow-down';
+        } else {
+            const position = state.anchorItem.querySelector('.livelist-item-position');
+            const name = state.anchorItem.querySelector('.song-name');
+            posEl.textContent = position ? position.textContent : '';
+            nameEl.textContent = name ? name.textContent : '';
+            dirEl.className = state.anchorItemSticky ? 'bi bi-arrow-up' : 'bi bi-arrow-down';
+        }
     }
 
     /* Songlist */

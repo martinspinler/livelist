@@ -46,6 +46,37 @@
     color: var(--bs-primary);
 }
 
+/* Navbar anchor info */
+#anchor-info-dir {
+    font-size: 0.8em;
+}
+
+.anchor-info-symbol {
+    font-size: 0.9em;
+}
+
+#anchor-info-pos {
+    min-width: 2.5em;
+    text-align: center;
+    vertical-align: middle;
+    line-height: 1.4;
+}
+
+#anchor-info-name {
+    display: inline-block;
+    max-width: 10em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    vertical-align: middle;
+}
+
+@media (min-width: 768px) {
+    #anchor-info-name {
+        max-width: 18em;
+    }
+}
+
 .container-fluid {
     --bs-gutter-x: 1.0em;
 }

@@ -9,6 +9,8 @@ function initDragAndDrop(s, handle_drag_and_drop) {
     let startClientX = 0;
     let currentClientX = 0;
     let currentClientY = 0;
+    let lastTargetItem = null;
+    let lastBefore = null;
 
     // Minimum distance in px before a pointer-down is considered a drag
     const DRAG_THRESHOLD = 5;
@@ -71,32 +73,60 @@ function initDragAndDrop(s, handle_drag_and_drop) {
 
     /**
      * Recalculate which livelist-item is under the pointer and apply
-     * the drag-over / drag-before / drag-after CSS classes.
+     * the drag-before / drag-after CSS classes.
+     *
+     * Skips re-rendering when the insertion point hasn't changed — this
+     * prevents wobble at item boundaries where "after A" and "before B"
+     * represent the same gap.
      */
     function updateDragVisuals() {
         draggedItem.style.display = 'none';
         const targetEl = document.elementFromPoint(currentClientX, currentClientY);
         draggedItem.style.display = '';
 
-        clearDragClasses();
-
-        if (!targetEl) return;
+        if (!targetEl) {
+            clearDragClasses();
+            lastTargetItem = null;
+            lastBefore = null;
+            return;
+        }
 
         const targetItem = targetEl.closest('.livelist-item, .livelist-break');
-        if (!targetItem || targetItem === draggedItem) return;
-
-        targetItem.classList.add('drag-over');
+        if (!targetItem || targetItem === draggedItem) {
+            clearDragClasses();
+            lastTargetItem = null;
+            lastBefore = null;
+            return;
+        }
 
         const rect = targetItem.getBoundingClientRect();
-        const before = currentClientY < rect.top + rect.height / 2;
+        let before = currentClientY < rect.top + rect.height / 2;
+
+        // Set 1 is the virtual first header — nothing can go above it,
+        // so force drag-after (insert as first song in the playlist).
+        if (before && targetItem.dataset.setKey) {
+            before = false;
+        }
+
+        // Same insertion point as last time — skip re-render
+        if (targetItem === lastTargetItem && before === lastBefore) return;
+
+        // Check for equivalent insertion point (after A == before A.nextElementSibling)
+        if (lastTargetItem !== null && lastBefore !== null) {
+            if (before && !lastBefore && lastTargetItem.nextElementSibling === targetItem) return;
+            if (!before && lastBefore && targetItem.nextElementSibling === lastTargetItem) return;
+        }
+
+        clearDragClasses();
 
         if (before) {
             targetItem.classList.add('drag-before');
-            targetItem.classList.remove('drag-after');
         } else {
             targetItem.classList.add('drag-after');
-            targetItem.classList.remove('drag-before');
         }
+
+        lastTargetItem = targetItem;
+        lastBefore = before;
     }
 
     // ---- Auto-scroll ----
@@ -215,19 +245,30 @@ function initDragAndDrop(s, handle_drag_and_drop) {
 
             if (targetItem && draggedItem !== targetItem) {
                 const draggedPliId = draggedItem.dataset.itemId;
-                const targetPliId = targetItem.dataset.itemId;
+                let targetPliId = targetItem.dataset.itemId;
 
                 const rect = targetItem.getBoundingClientRect();
-                const before = e.clientY < rect.top + rect.height / 2;
+                let before = e.clientY < rect.top + rect.height / 2;
 
-                const msg = {
-                    moved_ids: [parseInt(draggedPliId)],
-                    target_id: parseInt(targetPliId),
-                    before: before,
-                    playlist_id: state.currentPlaylist,
-                };
+                // Set 1 is a virtual header with no itemId — resolve to the
+                // first real item in the list so items can be moved to the top.
+                if (!targetPliId && targetItem.dataset.setKey) {
+                    const firstItem = livelist.querySelector('.livelist-item[data-item-id]');
+                    if (firstItem) {
+                        targetPliId = firstItem.dataset.itemId;
+                        before = true;
+                    }
+                }
 
-                handle_drag_and_drop(msg);
+                if (targetPliId) {
+                    const msg = {
+                        moved_ids: [parseInt(draggedPliId)],
+                        target_id: parseInt(targetPliId),
+                        before: before,
+                        playlist_id: state.currentPlaylist,
+                    };
+                    handle_drag_and_drop(msg);
+                }
             }
         }
 
@@ -236,7 +277,7 @@ function initDragAndDrop(s, handle_drag_and_drop) {
 
     function clearDragClasses() {
         livelist.querySelectorAll('.livelist-item, .livelist-break').forEach(item => {
-            item.classList.remove('drag-over', 'drag-before', 'drag-after');
+            item.classList.remove('drag-before', 'drag-after');
         });
     }
 
@@ -253,5 +294,7 @@ function initDragAndDrop(s, handle_drag_and_drop) {
         draggedItem = null;
         draggedItemId = null;
         isDragging = false;
+        lastTargetItem = null;
+        lastBefore = null;
     }
 }

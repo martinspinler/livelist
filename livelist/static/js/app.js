@@ -869,6 +869,9 @@ function initApplication() {
         state.lastAction = "add_song";
         state.socket.emit("add_song", data);
 
+        document.getElementById('song-filter').value = '';
+        filterSongs();
+
         if (document.getElementById('songlist-panel-pin').classList.contains("bi-pin")) {
             bootstrap.Offcanvas.getInstance(document.getElementById('songlist-panel')).hide();
         }

@@ -7,9 +7,17 @@ function initDragAndDrop(s, handle_drag_and_drop) {
     let isDragging = false;
     let startClientY = 0;
     let startClientX = 0;
+    let currentClientX = 0;
+    let currentClientY = 0;
 
     // Minimum distance in px before a pointer-down is considered a drag
     const DRAG_THRESHOLD = 5;
+
+    // Auto-scroll configuration
+    const AUTO_SCROLL_ZONE = 100;   // px from viewport edge to trigger scrolling
+    const AUTO_SCROLL_SPEED = 1000; // base px/sec (roughly 3 items/sec at ~60px/item)
+
+    let scrollAnimationId = null;
 
     livelist.addEventListener('pointerdown', onPointerDown);
 
@@ -25,11 +33,9 @@ function initDragAndDrop(s, handle_drag_and_drop) {
         isDragging = false;
         startClientX = e.clientX;
         startClientY = e.clientY;
+        currentClientX = e.clientX;
+        currentClientY = e.clientY;
 
-        // Listen on document so we receive move/up regardless of where the
-        // pointer travels.  We do NOT call setPointerCapture here – doing so
-        // would prevent the browser from dispatching the normal click event
-        // that the rest of the application relies on.
         document.addEventListener('pointermove', onPointerMove);
         document.addEventListener('pointerup', onPointerUp);
         document.addEventListener('pointercancel', onPointerUp);
@@ -37,6 +43,9 @@ function initDragAndDrop(s, handle_drag_and_drop) {
 
     function onPointerMove(e) {
         if (!draggedItem) return;
+
+        currentClientX = e.clientX;
+        currentClientY = e.clientY;
 
         const dx = e.clientX - startClientX;
         const dy = e.clientY - startClientY;
@@ -50,22 +59,22 @@ function initDragAndDrop(s, handle_drag_and_drop) {
             isDragging = true;
             draggedItem.classList.add('dragging');
 
-            // Now that we are definitely dragging, capture the pointer for
-            // reliable event tracking and to suppress the click that would
-            // otherwise fire on pointerup.
             livelist.setPointerCapture(e.pointerId);
         }
 
-        // Hide the dragged item's real element temporarily so that
-        // elementFromPoint returns the element *underneath* it.
+        updateDragVisuals();
+        checkAutoScroll();
+    }
+
+    /**
+     * Recalculate which livelist-item is under the pointer and apply
+     * the drag-over / drag-before / drag-after CSS classes.
+     */
+    function updateDragVisuals() {
         draggedItem.style.display = 'none';
-
-        const targetEl = document.elementFromPoint(e.clientX, e.clientY);
-
-        // Restore visibility immediately.
+        const targetEl = document.elementFromPoint(currentClientX, currentClientY);
         draggedItem.style.display = '';
 
-        // Clear visual feedback from all items.
         clearDragClasses();
 
         if (!targetEl) return;
@@ -76,7 +85,7 @@ function initDragAndDrop(s, handle_drag_and_drop) {
         targetItem.classList.add('drag-over');
 
         const rect = targetItem.getBoundingClientRect();
-        const before = e.clientY < rect.top + rect.height / 2;
+        const before = currentClientY < rect.top + rect.height / 2;
 
         if (before) {
             targetItem.classList.add('drag-before');
@@ -87,10 +96,102 @@ function initDragAndDrop(s, handle_drag_and_drop) {
         }
     }
 
+    // ---- Auto-scroll ----
+
+    /**
+     * Return the viewport Y coordinate that marks the top of the area
+     * where list items are visible (just below any sticky headers).
+     */
+    function getScrollAreaTop() {
+        const nav = document.querySelector('nav.sticky-top');
+        if (nav) {
+            return nav.getBoundingClientRect().bottom;
+        }
+        return 0;
+    }
+
+    function checkAutoScroll() {
+        if (!isDragging || !draggedItem) {
+            stopAutoScroll();
+            return;
+        }
+
+        const topEdge = getScrollAreaTop();
+        const bottomEdge = window.innerHeight;
+
+        const nearTop = currentClientY >= topEdge && currentClientY < topEdge + AUTO_SCROLL_ZONE;
+        const nearBottom = currentClientY > bottomEdge - AUTO_SCROLL_ZONE;
+
+        if (nearTop || nearBottom) {
+            startAutoScroll();
+        } else {
+            stopAutoScroll();
+        }
+    }
+
+    function startAutoScroll() {
+        if (scrollAnimationId !== null) return; // already running
+
+        let lastTime = null;
+
+        function step(timestamp) {
+            if (!isDragging || !draggedItem) {
+                stopAutoScroll();
+                return;
+            }
+
+            if (!lastTime) lastTime = timestamp;
+            const delta = Math.min((timestamp - lastTime) / 1000, 0.1);
+            lastTime = timestamp;
+
+            const topEdge = getScrollAreaTop();
+            const bottomEdge = window.innerHeight;
+
+            let scrolled = false;
+
+            if (currentClientY >= topEdge && currentClientY < topEdge + AUTO_SCROLL_ZONE) {
+                const intensity = 1 - (currentClientY - topEdge) / AUTO_SCROLL_ZONE;
+                const amount = -AUTO_SCROLL_SPEED * delta * intensity;
+                window.scrollBy({ top: amount, behavior: 'instant' });
+                scrolled = true;
+            } else if (currentClientY > bottomEdge - AUTO_SCROLL_ZONE) {
+                const intensity = 1 - (bottomEdge - currentClientY) / AUTO_SCROLL_ZONE;
+                const amount = AUTO_SCROLL_SPEED * delta * intensity;
+                window.scrollBy({ top: amount, behavior: 'instant' });
+                scrolled = true;
+            }
+
+            if (scrolled) {
+                // Content shifted under the stationary pointer – refresh highlight
+                updateDragVisuals();
+            }
+
+            if (!scrolled) {
+                stopAutoScroll();
+                return;
+            }
+
+            scrollAnimationId = requestAnimationFrame(step);
+        }
+
+        scrollAnimationId = requestAnimationFrame(step);
+    }
+
+    function stopAutoScroll() {
+        if (scrollAnimationId !== null) {
+            cancelAnimationFrame(scrollAnimationId);
+            scrollAnimationId = null;
+        }
+    }
+
+    // ---- End auto-scroll ----
+
     function onPointerUp(e) {
         document.removeEventListener('pointermove', onPointerMove);
         document.removeEventListener('pointerup', onPointerUp);
         document.removeEventListener('pointercancel', onPointerUp);
+
+        stopAutoScroll();
 
         if (isDragging) {
             try {
@@ -103,7 +204,6 @@ function initDragAndDrop(s, handle_drag_and_drop) {
         if (!draggedItem) return;
 
         if (isDragging) {
-            // Determine the drop target from the final pointer position.
             draggedItem.style.display = 'none';
             const targetEl = document.elementFromPoint(e.clientX, e.clientY);
             draggedItem.style.display = '';
@@ -128,7 +228,6 @@ function initDragAndDrop(s, handle_drag_and_drop) {
             }
         }
 
-        // Clean up
         cleanupDrag();
     }
 
@@ -139,6 +238,8 @@ function initDragAndDrop(s, handle_drag_and_drop) {
     }
 
     function cleanupDrag() {
+        stopAutoScroll();
+
         if (draggedItem) {
             draggedItem.classList.remove('dragging', 'disabled', 'd-none');
             draggedItem.style.display = '';

@@ -64,7 +64,7 @@
 
 #anchor-info-name {
     display: inline-block;
-    max-width: 10em;
+    max-width: 8em;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;

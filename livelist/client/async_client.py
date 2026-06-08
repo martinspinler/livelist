@@ -5,6 +5,8 @@ from dataclasses import fields
 from typing import Any, Dict, List, Optional, Tuple
 
 import socketio
+from socketio.exceptions import ConnectionError as SocketConnectionError
+from socketio.exceptions import TimeoutError as SocketTimeoutError
 
 from .models import PlaylistItem, PlaylistItemId, Song
 from .playlist import PlaylistClient
@@ -50,7 +52,7 @@ class AsyncLivelistClient(PlaylistClient):
         try:
             await self.get_songlist()
             await self.select_playlist()
-        except ConnectionError:
+        except SocketConnectionError:
             pass
 
     async def _disconnect(self) -> None:
@@ -92,7 +94,7 @@ class AsyncLivelistClient(PlaylistClient):
         while True:
             try:
                 event, data = await self.sio.receive()
-            except ConnectionError:
+            except (SocketConnectionError, SocketTimeoutError):
                 break
 
             handlers = {

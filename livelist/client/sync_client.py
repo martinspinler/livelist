@@ -4,6 +4,7 @@ from dataclasses import fields
 from typing import Any, Dict, List, Optional
 
 import socketio
+from socketio.exceptions import TimeoutError as SocketTimeoutError
 
 from .models import PlaylistInfo, PlaylistItem, PlaylistItemId, Song
 from .playlist import PlaylistClient
@@ -72,7 +73,7 @@ class SyncLivelistClient(PlaylistClient):
             try:
                 event, data = self.sio.receive(timeout=timeout)
                 self._handle_event(event, data)
-            except (ConnectionError, TimeoutError):
+            except (ConnectionError, SocketTimeoutError):
                 break
 
     def drain_events(self, timeout: float = 1.0) -> None:
@@ -87,7 +88,7 @@ class SyncLivelistClient(PlaylistClient):
                 event, data = self.sio.receive(timeout=timeout)
                 self._handle_event(event, data)
                 timeout = short_timeout  # Drain remaining quickly
-            except TimeoutError:
+            except SocketTimeoutError:
                 break
 
     # ---- Internal helpers ----------------------------------------------

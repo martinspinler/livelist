@@ -1,5 +1,6 @@
 <!doctype html>
-<html lang="en" data-bs-theme="dark">
+<html lang="{{ lang }}" data-bs-theme="dark">
+
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -15,6 +16,7 @@
 
     {% block extra_head %}{% endblock %}
 </head>
+
 <body>
     {% block body %}
     <div id="app">
@@ -27,4 +29,5 @@
 
     {% block scripts %}{% endblock %}
 </body>
+
 </html>

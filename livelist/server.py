@@ -13,6 +13,7 @@ from .config.settings import Config
 from .models import Band, Song, Playlist, PlaylistItem, Tag, db
 from .routes import views_bp
 from .routes.views import get_privileges, get_default_playlist
+from .l10n import t as _t, get_translations, detect_language, get_supported_langs
 
 
 # TODO: TAGS, edit song, create song
@@ -40,6 +41,27 @@ socketio = SocketIO(
 
 # Register blueprints
 app.register_blueprint(views_bp)
+
+
+@app.context_processor
+def inject_l10n():
+    """Make translations available in all Jinja2 templates.
+
+    Exposes:
+    - ``_``   — shortcut for ``t(key)`` look-ups with English fallback
+                  (e.g. ``{{ _('nav_help') }}``)
+    - ``l10n`` — the full translations dict for the detected language
+    - ``lang`` — the detected language code (e.g. ``"en"``, ``"cs"``)
+    - ``supported_langs`` — list of available language codes
+    """
+    lang = detect_language()
+    translations = get_translations(lang)
+    return {
+        "_": lambda key, **kw: _t(key, translations, **kw),
+        "l10n": translations,
+        "lang": lang,
+        "supported_langs": get_supported_langs(),
+    }
 
 
 @app.route("/api/init.js")

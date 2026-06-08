@@ -74,8 +74,10 @@
             <button class="btn bi bi-box-arrow-right livelist-break-move-to-anchor d-none"
                 title="Move to anchor"></button>
             <span class="btn bi bi-grip-vertical livelist-break-grip drag-handle d-none"></span>
-            <button class="btn btn-outline-danger bi bi-trash livelist-break-delete d-none" title="Delete break"></button>
-            <button class="btn btn-outline-primary bi bi-clipboard clipboard-copy-break-set d-none" title="Copy set"></button>
+            <button class="btn btn-outline-danger bi bi-trash livelist-break-delete d-none"
+                title="Delete break"></button>
+            <button class="btn btn-outline-primary bi bi-clipboard clipboard-copy-break-set d-none"
+                title="Copy set"></button>
         </div>
     </li>
 </template>
@@ -144,7 +146,7 @@
 </template>
 
 <!-- Navigation -->
-<nav class="navbar bg-body-tertiary navbar-expand-lg sticky-top">
+<nav class="navbar bg-body-tertiary navbar-expand sticky-top">
     <div class="container-fluid">
         <div id="playlistHeader">
             <span class="navbar-brand text-muted" id="livelist-name"></span>
@@ -153,19 +155,22 @@
     </div>
     <div class="container-fluid mt-2">
         <div id="nav-main">
-            <button class="btn btn-outline-primary bi bi-plus mx-lg-2" data-bs-toggle="offcanvas"
-                data-bs-target="#songlist-panel" id="btn-songlist-panel">Add Song</button>
-            <button class="btn btn-outline-primary bi bi-list-ul mx-lg-2" data-bs-toggle="offcanvas"
-                data-bs-target="#playlist-panel">Playlists</button>
-            <a class="btn btn-outline-primary bi bi-file-play mx-lg-2"
-                href="{{ url_for('views.play_view', playlist_id=playlist.id) if playlist else '#' }}"
-                target="_blank">Live</a>
+            <button class="btn btn-outline-primary bi bi-list-ul mx-1 mx-lg-2" data-bs-toggle="offcanvas"
+                data-bs-target="#playlist-panel" title="{{ _('nav_playlists') }}">
+                <span class="d-none d-sm-inline">{{ _('nav_playlists') }}</span></button>
+            <a class="btn btn-outline-primary bi bi-file-play mx-1 mx-lg-2"
+                href="{{ url_for('views.play_view', playlist_id=playlist.id) if playlist else '#' }}" target="_blank"
+                title="{{ _('nav_live') }}">
+                <span class="d-none d-sm-inline">{{ _('nav_live') }}</span></a>
+            <button class="btn btn-outline-primary bi bi-question-circle mx-1 mx-lg-2" data-bs-toggle="modal"
+                data-bs-target="#help-modal" title="{{ _('nav_help') }}">
+                <span class="d-none d-sm-inline">{{ _('nav_help') }}</span></button>
         </div>
         <div id="nav-edit" class="d-none">
             <button class="btn btn-danger bi bi-trash  xd-none" id="livelist-delete-selected"
-                title="Delete selected">Delete selected</button>
-            <button class="btn btn-warning bi bi-sort-numeric-down" id="edit-sort" title="Update order">Update
-                order</button>
+                title="{{ _('action_delete_selected') }}">{{ _('action_delete_selected') }}</button>
+            <button class="btn btn-warning bi bi-sort-numeric-down" id="edit-sort"
+                title="{{ _('action_update_order') }}">{{ _('action_update_order') }}</button>
         </div>
     </div>
     <div class="container-fluid mt-1">
@@ -174,13 +179,18 @@
             <span id="anchor-info-name"></span> <span class="anchor-info-symbol">⚓</span><i id="anchor-info-dir"
                 class="bi bi-arrow-down"></i>
         </span>
+        <button class="btn btn-outline-primary bi bi-plus mx-1" data-bs-toggle="offcanvas"
+            data-bs-target="#songlist-panel" id="btn-songlist-panel" title="{{ _('nav_add_song') }}">
+            <span class="d-none d-sm-inline">{{ _('nav_add_song') }}</span></button>
         <div class="btn-group btn-group ms-auto" id="mode-toggle">
-            <button class="btn btn-primary" id="mode-play" title="Play mode"><i class="bi bi-play-fill"></i> <span
-                    class="d-none d-md-inline">Play</span></button>
-            <button class="btn btn-outline-primary" id="mode-move" title="Move mode"><i class="bi bi-arrows-move"></i>
-                <span class="d-none d-md-inline">Move</span></button>
-            <button class="btn btn-outline-primary" id="mode-edit" title="Edit mode"><i class="bi bi-pencil-fill"></i>
-                <span class="d-none d-md-inline">Edit</span></button>
+            <button class="btn btn-primary" id="mode-play" title="{{ _('mode_play') }}"><i class="bi bi-play-fill"></i>
+                <span class="d-none d-md-inline">{{ _('mode_play') }}</span></button>
+            <button class="btn btn-outline-primary" id="mode-move" title="{{ _('mode_move') }}"><i
+                    class="bi bi-arrows-move"></i>
+                <span class="d-none d-md-inline">{{ _('mode_move') }}</span></button>
+            <button class="btn btn-outline-primary" id="mode-edit" title="{{ _('mode_edit') }}"><i
+                    class="bi bi-pencil-fill"></i>
+                <span class="d-none d-md-inline">{{ _('mode_edit') }}</span></button>
         </div>
     </div>
     <!-- Selection events: sort, cut (and move to another position / playlist) -->
@@ -201,7 +211,7 @@
 <!-- Songlist Panel (Offcanvas) -->
 <div class="offcanvas offcanvas-start" tabindex="-1" id="songlist-panel">
     <div class="offcanvas-header">
-        <h5 class="offcanvas-title">Song Library</h5>
+        <h5 class="offcanvas-title">{{ _('song_library_title') }}</h5>
         <button type="button" class="btn btn-outline-primary bi bi-pencil-fill float-end"
             id="songlist-panel-edit"></button>
         <button type="button" class="btn btn-pin bi bi-pin-fill float-end" id="songlist-panel-pin"></button>
@@ -212,7 +222,7 @@
         <div class="mb-3">
             <div class="input-group mb-2">
                 <input type="text padding-right" class="form-control" id="song-filter"
-                    placeholder="Type or use keypad...">
+                    placeholder="{{ _('song_library_search_ph') }}">
                 <button class="btn btn-outline-warning bi bi-plus songlist-mode-edit d-none" type="button"
                     id="songlist-song-create"></button>
                 <button class="btn btn-outline-secondary bi bi-keyboard songlist-mode-add" type="button"
@@ -235,11 +245,14 @@
                 </div>
             </div>
             <div class="d-flex gap-2 mb-2">
-                <button class="btn btn-sm btn-outline-primary bi bi-sort-alpha-down" id="sort-alpha">A-Z</button>
-                <button class="btn btn-sm btn-outline-primary bi bi-sort-numeric-down" id="sort-bpm">BPM</button>
-                <button class="btn btn-sm btn-outline-primary bi bi-sort-down" id="sort-id">ID</button>
+                <button class="btn btn-sm btn-outline-primary bi bi-sort-alpha-down" id="sort-alpha">{{ _('sort_alpha')
+                    }}</button>
+                <button class="btn btn-sm btn-outline-primary bi bi-sort-numeric-down" id="sort-bpm">{{ _('sort_bpm')
+                    }}</button>
+                <button class="btn btn-sm btn-outline-primary bi bi-sort-down" id="sort-id">{{ _('sort_id') }}</button>
                 <div class="btn-group btn-group-sm">
-                    <button class="btn btn-outline-primary bi bi-tags" id="tag-filter-btn">Tags</button>
+                    <button class="btn btn-outline-primary bi bi-tags" id="tag-filter-btn">{{ _('tag_filter_btn')
+                        }}</button>
                     <button class="btn btn-outline-primary bi bi-gear" id="tag-filter-advanced-toggle"></button>
                 </div>
 
@@ -253,19 +266,21 @@
                 <div class="d-none" id="tag-filter-advanced">
                     <hr class="my-2" />
                     <div class="mb-2" id="tag-filter-gates-section">
-                        <small class="text-muted">Hidden songs</small>
+                        <small class="text-muted">{{ _('hidden_songs') }}</small>
                         <div class="d-flex flex-wrap gap-1 mt-1" id="tag-filter-gates"></div>
                     </div>
                     <div class="btn-group btn-group-sm mb-2">
-                        <button class="btn btn-outline-secondary" id="tag-filter-and">AND</button>
-                        <button class="btn btn-outline-secondary active" id="tag-filter-or">OR</button>
+                        <button class="btn btn-outline-secondary" id="tag-filter-and">{{ _('filter_and') }}</button>
+                        <button class="btn btn-outline-secondary active" id="tag-filter-or">{{ _('filter_or')
+                            }}</button>
                     </div>
                 </div>
             </div>
         </div>
 
         <!-- Add Break button -->
-        <button class="btn btn-outline-secondary w-100 mb-2 bi bi-dash-lg" id="btn-add-break">Add Break</button>
+        <button class="btn btn-outline-secondary w-100 mb-2 bi bi-dash-lg" id="btn-add-break">{{ _('add_break')
+            }}</button>
 
         <!-- Song list -->
         <div id="song-list-container">
@@ -279,16 +294,18 @@
 <!-- Playlist Panel (Offcanvas) -->
 <div class="offcanvas offcanvas-start" tabindex="-1" id="playlist-panel">
     <div class="offcanvas-header">
-        <h5 class="offcanvas-title">Playlists</h5>
+        <h5 class="offcanvas-title">{{ _('playlist_panel_title') }}</h5>
         <button type="button" class="btn-close" data-bs-dismiss="offcanvas"></button>
     </div>
     <div class="offcanvas-body">
         <!-- Create new playlist form -->
         <div class="mb-3">
             <div class="input-group">
-                <input type="text" class="form-control" id="new-playlist-name" placeholder="Playlist name">
+                <input type="text" class="form-control" id="new-playlist-name"
+                    placeholder="{{ _('playlist_name_ph') }}">
                 <input type="date" class="form-control" id="new-playlist-date" value="{{ date_today }}">
-                <button class="btn btn-primary bi bi-plus-circle" id="create-playlist-btn">Create</button>
+                <button class="btn btn-primary bi bi-plus-circle" id="create-playlist-btn">{{ _('playlist_create')
+                    }}</button>
             </div>
         </div>
 
@@ -302,25 +319,26 @@
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title">Edit Playlist</h5>
+                <h5 class="modal-title">{{ _('modal_edit_playlist_title') }}</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
                 <form id="edit-playlist-form">
                     <div class="mb-3">
-                        <label for="edit-playlist-name" class="form-label">Name</label>
+                        <label for="edit-playlist-name" class="form-label">{{ _('label_name') }}</label>
                         <input type="text" class="form-control" id="edit-playlist-name" required>
                     </div>
                     <div class="mb-3">
-                        <label for="edit-playlist-date" class="form-label">Date</label>
+                        <label for="edit-playlist-date" class="form-label">{{ _('label_date') }}</label>
                         <input type="date" class="form-control" id="edit-playlist-date" required>
                     </div>
                     <input type="hidden" id="edit-playlist-id">
                 </form>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-primary" id="save-playlist-changes">Save Changes</button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ _('btn_cancel') }}</button>
+                <button type="button" class="btn btn-primary" id="save-playlist-changes">{{ _('btn_save_changes')
+                    }}</button>
             </div>
         </div>
     </div>
@@ -331,21 +349,21 @@
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title">Edit Song</h5>
+                <h5 class="modal-title">{{ _('modal_edit_song_title') }}</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
                 <form id="edit-song-form">
                     <div class="mb-3">
-                        <label for="edit-song-name" class="form-label">Name</label>
+                        <label for="edit-song-name" class="form-label">{{ _('label_name') }}</label>
                         <input type="text" class="form-control" id="edit-song-name" required>
                     </div>
                     <div class="mb-3">
-                        <label for="edit-song-bpm" class="form-label">BPM</label>
+                        <label for="edit-song-bpm" class="form-label">{{ _('label_bpm') }}</label>
                         <input type="text" class="form-control" id="edit-song-bpm" required>
                     </div>
 
-                    <label for="edit-song-tag" class="form-label">Tags</label>
+                    <label for="edit-song-tag" class="form-label">{{ _('label_tags') }}</label>
                     <div id="edit-song-tags" class="gap-1 pb-2"></div>
                     <div class="mb-3 input-group">
                         <button type="button" class="btn btn-outline-secondary" id="edit-song-tag-toggle"
@@ -358,8 +376,83 @@
                 </form>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-primary" id="save-song-changes">Save Changes</button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ _('btn_cancel') }}</button>
+                <button type="button" class="btn btn-primary" id="save-song-changes">{{ _('btn_save_changes')
+                    }}</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Help Modal -->
+<div class="modal fade" id="help-modal" tabindex="-1">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title bi bi-question-circle"> {{ _('help_title') }}</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+
+                <h6>{{ _('help_livelist_title') }}</h6>
+                <p class="text-muted">{{ _('help_livelist_desc') }}</p>
+
+                <ul class="list-unstyled ms-3">
+                    <li class="mb-2"><strong>▶</strong> {{ _('help_play_mode') }}</li>
+                    <li class="mb-2"><strong>≡</strong> {{ _('help_move_mode') }}</li>
+                    <li class="mb-2"><strong>#</strong> {{ _('help_edit_mode') }}</li>
+                </ul>
+
+                <hr>
+
+                <h6>{{ _('help_set_breaks_title') }}</h6>
+                <p class="text-muted">{{ _('help_set_breaks_desc') }}</p>
+                <ul class="list-unstyled ms-3">
+                    <li class="mb-2">{{ _('help_add_break') }}</li>
+                    <li class="mb-2">{{ _('help_set_header') }}</li>
+                    <li class="mb-2">{{ _('help_collapse') }}</li>
+                    <li class="mb-2">{{ _('help_anchor_in_set') }}</li>
+                    <li class="mb-2">{{ _('help_reorder_delete_breaks') }}</li>
+                    <li class="mb-2">{{ _('help_nav_skip_breaks') }}</li>
+                </ul>
+
+                <hr>
+
+                <h6>{{ _('help_anchor_title') }}</h6>
+                <p class="text-muted">{{ _('help_anchor_desc') }}</p>
+                <ul class="list-unstyled ms-3">
+                    <li class="mb-2">{{ _('help_anchor_nonsticky') }}</li>
+                    <li class="mb-2">{{ _('help_anchor_sticky') }}</li>
+                </ul>
+
+                <hr>
+
+                <h6>{{ _('help_song_library_title') }}</h6>
+                <p class="text-muted">{{ _('help_song_library_desc') }}</p>
+                <ul class="list-unstyled ms-3">
+                    <li class="mb-2">{{ _('help_search') }}</li>
+                    <li class="mb-2">{{ _('help_sorting') }}</li>
+                    <li class="mb-2">{{ _('help_tag_filter') }}</li>
+                    <li class="mb-2">{{ _('help_add_to_playlist') }}</li>
+                    <li class="mb-2">{{ _('help_pin_panel') }}</li>
+                    <li class="mb-2">{{ _('help_library_edit_mode') }}</li>
+                </ul>
+
+                <hr>
+
+                <h6>{{ _('help_playlist_manager_title') }}</h6>
+                <p class="text-muted">{{ _('help_playlist_manager_desc') }}</p>
+                <ul class="list-unstyled ms-3">
+                    <li class="mb-2">{{ _('help_playlist_create') }}</li>
+                    <li class="mb-2">{{ _('help_playlist_select') }}</li>
+                    <li class="mb-2">{{ _('help_playlist_activate') }}</li>
+                    <li class="mb-2">{{ _('help_playlist_edit') }}</li>
+                    <li class="mb-2">{{ _('help_playlist_delete') }}</li>
+                </ul>
+
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ _('btn_cancel') }}</button>
             </div>
         </div>
     </div>

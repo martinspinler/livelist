@@ -8,9 +8,9 @@ TRANSLATIONS: dict[str, str] = {
     "nav_help":           "Nápověda",
 
     # ---- Přepínač režimu ----
-    "mode_play":          "Hrát",
+    "mode_play":          "Hraní",
     "mode_move":          "Přesun",
-    "mode_edit":          "Upravit",
+    "mode_edit":          "Úpravy",
 
     # ---- Akce v režimu úprav ----
     "action_delete_selected": "Smazat vybrané",
@@ -18,7 +18,7 @@ TRANSLATIONS: dict[str, str] = {
 
     # ---- Panel knihovny písní ----
     "song_library_title":     "Knihovna písní",
-    "song_library_search_ph": "Hledej nebo použij klávesnici...",
+    "song_library_search_ph": "Začni psát nebo použij keypad...",
     "sort_alpha":             "A-Z",
     "sort_bpm":               "BPM",
     "sort_id":                "ID",
@@ -26,7 +26,7 @@ TRANSLATIONS: dict[str, str] = {
     "hidden_songs":           "Skryté písně",
     "filter_and":             "AND",
     "filter_or":              "OR",
-    "add_break":              "Přidat přerušení",
+    "add_break":              "Přidat set",
 
     # ---- Panel playlistů ----
     "playlist_panel_title":   "Playlisty",
@@ -47,83 +47,83 @@ TRANSLATIONS: dict[str, str] = {
 
     # ---- Tooltipy / názvy prvků seznamu ----
     "title_play":           "Přehrát",
-    "title_move_to_anchor": "Přesunout k ukotvení",
+    "title_move_to_anchor": "Přesunout ke kotvě",
     "title_delete":         "Smazat",
-    "title_delete_break":   "Smazat přerušení",
-    "title_collapse_set":   "Sbalit sadu",
-    "title_copy_set":       "Kopírovat sadu",
+    "title_delete_break":   "Smazat set",
+    "title_collapse_set":   "Sbalit set",
+    "title_copy_set":       "Kopírovat položky v setu",
 
     # ---- Systém ukotvení ----
-    "anchor_label":         "Ukotvení",
+    "anchor_label":         "Kotva",
 
     # ---- Popisy sad / přerušení ----
-    "set_label":            "Sada {n}",
+    "set_label":            "Set {n}",
 
-    # ---- Modální okno nápovědy ----
+    # ---- Okno nápovědy ----
     "help_title":                         "Nápověda",
 
     "help_livelist_title":                "Livelist (Hlavní zobrazení)",
-    "help_livelist_desc":                 "Centrální oblast zobrazuje aktuální playlist jako uspořádaný číslovaný seznam písní. Zobrazení pracuje ve třech režimech, přepínatelných skupinou tlačítek Hrát / Přesun / Upravit v navigační liště.",
+    "help_livelist_desc":                 "Centrální oblast zobrazuje aktuální playlist jako uspořádaný číslovaný seznam písní. Zobrazení pracuje ve třech režimech, přepínatelných skupinou tlačítek Přehrávání / Přesun / Úpravy v navigační liště.",
 
-    "help_play_mode":                     "Režim hraní (výchozí) — Režim pro vystoupení. Klepněte na tlačítko přehrání u libovolné položky pro označení jako aktivní píseň; událost se odešle všem připojeným klientům. Ukotvení je viditelné pro přidávání písní na určitou pozici.",
-    "help_move_mode":                     'Režim přesunu — Režim pro přeskládání. Každá položka zobrazuje úchyt pro přetažení a tlačítko "přesunout k ukotvení" na pravé straně. Písně lze přeskládat přetažením nebo přesunem na pozici ukotvení.',
-    "help_edit_mode":                     "Režim úprav — Režim správy. Čísla pozic se stávají klikatelnými cíly výběru. Vyberte více položek pro hromadné smazání nebo aktualizaci pořadí.",
+    "help_play_mode":                     "Režim hraní (výchozí) — Klepnutí na tlačítko přehrání u libovolné položky ji označí jako akutálně přehrávanou; událost se odešle všem připojeným klientům.",
+    "help_move_mode":                     'Režim přesunu — U každé položky se zobrazí úchyt pro přetažení a tlačítko "přesunout ke kotvě" na pravé straně. Písně lze přeskládat přetažením na konkrétní pozici nebo pomocí tlačítka k pozici kotvy.',
+    "help_edit_mode":                     "Režim úprav — Slouží pro výběr více položek a následně pro hromadné smazání nebo přehlednější změnu pořadí.",
 
-    "help_set_breaks_title":              "Přerušení mezi sadami",
-    "help_set_breaks_desc":               'Položky přerušení/pauzy rozdělují playlist do sad. Každý playlist začíná hlavičkou "Sada 1", další přerušení lze vložit pro vytvoření dalších sad (Sada 2, Sada 3 atd.).',
-    "help_add_break":                     'Přidat přerušení — Klepněte na tlačítko "Přidat přerušení" v panelu Knihovna písní pro vložení oddělovače sad za aktuální pozici ukotvení.',
-    "help_set_header":                    'Hlavička sady — Každá sada zobrazuje: popisek (např. "Sada 1"), počet písní, tlačítko kopírování do schránky a přepínání sbalení.',
-    "help_collapse":                      "Sbalení — Klepněte na šipku v hlavičce sady pro sbalení/rozbalení písní v dané sadě.",
-    "help_anchor_in_set":                 "Ukotvení — Klepněte na hlavičku sady nebo její ikonu ukotvení pro nastavení ukotvení na danou pozici.",
-    "help_reorder_delete_breaks":         "Přeskládání/smazání — V režimu přesunu mají přerušení úchyty pro přetažení; v režimu úprav zobrazují tlačítka smazání. Sadu 1 nelze smazat.",
-    "help_nav_skip_breaks":               "Navigace — Předchozí/následující přehrávání automaticky přeskakuje položky přerušení; přerušení nelze přehrát.",
+    "help_set_breaks_title":              "Sety / přestávky",
+    "help_set_breaks_desc":               'Pro lepší přehled může být playlist organizován do více setů (např. pro indikaci přestávky), přičemž každý playlist obsahuje alespoň jeden set.',
+    "help_add_break":                     'Přidat set — Klepněte na tlačítko "Přidat set" v panelu Knihovna písní pro vložení oddělovače za aktuální pozici kotvy.',
+    "help_set_header":                    'Nadpis setu — Každý set zobrazuje: popisek (např. "Set 1"), počet písní, tlačítko kopírování části playlistu do schránky a přepínač pro sbalení/skrytí položek setu pro lepší přehled.',
+    "help_collapse":                      "Sbalení — Klepněte na šipku v napisu setu pro sbalení/rozbalení písní v daném setu.",
+    "help_anchor_in_set":                 "Kotva — Kotva u nadpisu setu funguje úplně stejně jako pro jednotlivé položky playlistu. Klepněte na hlavičku setu pro nastavení kotvy na danou pozici.",
+    "help_reorder_delete_breaks":         "Přeskládání / smazání — V režimu přesunu mají přestávky úchyty pro přetažení; v režimu úprav zobrazují tlačítka smazání. První set nelze smazat.",
+    "help_nav_skip_breaks":               "Navigace — Funcke Přehrát další / předchozí automaticky přeskakuje přestávky; ty samozřejmě nelze přehrávat.",
 
     "help_anchor_title":                  "Systém ukotvení",
-    "help_anchor_desc":                   'Ukotvení určuje, kam se vkládají nové písně a kam se přesouvají položky při použití "přesunout k ukotvení". Má dva stavy, přepínatelné kliknutím na položku ukotvení:',
-    "help_anchor_nonsticky":              "Nelepkavé (⚓↓) — Položky se vkládají/přesouvají za ukotvení, poté se ukotvení posune za novou položku. Umožňuje sekvenční postup.",
-    "help_anchor_sticky":                 "Lepkavé (⚓↑) — Položky se vkládají/přesouvají před ukotvení a ukotvení zůstává na místě. Umožňuje hromadění položek na pevné pozici.",
+    "help_anchor_desc":                   'Kotva určuje, kam se vkládají nové písně a kam se přesouvají položky při použití "přesunout ke kotvě". Má dva stavy, přepínatelné kliknutím na položku:',
+    "help_anchor_nonsticky":              "Pohyblivé (⚓↓) — Položky se vkládají/přesouvají za kotvu, poté se kotva posune na novou/přesunutou položku. Umožňuje postupně přidávat položky ZA.",
+    "help_anchor_sticky":                 "Stálé (⚓↑) — Položky se vkládají/přesouvají před kotvu a ta zůstává na stejné položce. Umožňuje postupně přidávat položky PŘED.",
 
     "help_song_library_title":            "Knihovna písní",
     "help_song_library_desc":             "Prohledávatelný a filtrovatelný katalog všech písní v knihovně kapely.",
     "help_search":                        "Hledání — Textový vstup s filtrováním během psaní plus volitelná klávesnice ve stylu T9 pro rychlé vyhledávání.",
     "help_sorting":                       "Řazení — Seřaďte abecedně (A–Z), podle BPM nebo podle ID.",
-    "help_tag_filter":                    "Filtrování štítků — Přidejte/odstraňte štítky; přepínejte každý štítek mezi režimem zahrnutí/vyloučení. Rozšířené nastavení zobrazuje ovládací prvky bran a přepínač logiky AND/OR.",
+    "help_tag_filter":                    'Filtrování štítků — Přidejte/odstraňte štítky; přepínejte každý štítek mezi režimem "zahrnout" / "vyloučit". Rozšířené nastavení zobrazuje skryté štítky a přepínač logiky AND/OR.',
     "help_add_to_playlist":               "Přidat do playlistu — Klepněte na píseň pro její přidání do aktuálního playlistu.",
-    "help_pin_panel":                     "Připnout panel — Připněte boční panel otevřený místo automatického zavírání.",
-    "help_library_edit_mode":             "Režim úprav — Přepněte knihovnu do režimu úprav pro vytváření nových písní, úpravu stávajících nebo správu štítků s konvencemi prefixů.",
+    "help_pin_panel":                     "Připnout panel — Připněte boční panel, aby se nezavřel po přidání písně a umožnil tak přidání více skladeb najednou.",
+    "help_library_edit_mode":             "Režim úprav — Přepněte knihovnu do režimu úprav pro vytváření nových písní, úpravu stávajících nebo správu štítků.",
 
     "help_playlist_manager_title":        "Správa playlistů",
     "help_playlist_manager_desc":         "Spravujte všechny playlisty kapely.",
-    "help_playlist_create":               "Vytvořit — Formulář s názvem a datem pro vytvoření nového playlistu.",
-    "help_playlist_select":               "Vybrat — Klepněte na playlist pro jeho načtení do hlavního zobrazení.",
-    "help_playlist_activate":             "Aktivovat — Nastavte playlist jako aktivní playlist kapely (ikona vysílání).",
-    "help_playlist_edit":                 "Upravit — Přejmenujte playlist nebo změňte datum prostřednictvím modálního okna.",
+    "help_playlist_create":               "Vytvořit — Dialog s názvem a datem pro vytvoření nového playlistu.",
+    "help_playlist_select":               "Vybrat — Klepněte na playlist pro jeho načtení do hlavního zobrazení pouze pro sebe.",
+    "help_playlist_activate":             "Aktivovat — Nastavte playlist jako aktivní playlist kapely (ikona vysílání) i pro všechny ostatní.",
+    "help_playlist_edit":                 "Upravit — Přejmenujte playlist nebo změňte datum.",
     "help_playlist_delete":               "Smazat — Odstraňte playlist.",
 
     # ---- Úvodní stránka ----
     "index_title":          "Livelist",
-    "index_subtitle":       "Spolupráce na playlistech pro živé kapely",
-    "index_features":       "Webová aplikace v reálném čase, která kapelám pomáhá organizovat knihovnu písní a spravovat setlisty během živých vystoupení. Více členů kapely se může připojit současně a okamžitě vidět změny playlistu.",
+    "index_subtitle":       "Spolupracujte na playlistu pro koncert vaší kapely živě",
+    "index_features":       "Webová aplikace, která kapelám pomáhá organizovat knihovnu písní a spravovat playlisty během živých vystoupení. Všichni členové kapely se mohou připojit současně, podílet se na přípravě playlistu a okamžitě vidět změny od ostatních.",
     "index_select_band":    "Vybrat kapelu",
-    "index_choose_band":    "Vyberte kapelu pro zobrazení a správu playlistů.",
+    "index_choose_band":    "Vyberte již uloženou kapelu pro zobrazení a správu playlistů.",
     "index_bad_access":     "Adresa kapely nebo klíč nefunguje.",
     "index_address":        "Adresa",
     "index_enter_key_for":  "Zadejte klíč pro {addr}:",
-    "index_or_access":      "Nebo přejděte pomocí adresy a klíče:",
+    "index_or_access":      "Nebo přejděte na existující pomocí adresy a klíče:",
     "index_go":             "Přejít",
     "index_log_out":        "Odhlásit se z {addr}",
 
     # ---- Sekce funkcí na úvodní stránce ----
     "feature_realtime_title":   "Spolupráce v reálném čase",
-    "feature_realtime_desc":    "Všechny změny playlistu jsou okamžitě synchronizovány všem připojeným členům kapely přes WebSocket.",
+    "feature_realtime_desc":    "Všechny změny playlistu jsou hned zobrazeny všem připojeným členům kapely.",
     "feature_modes_title":      "Tři pracovní režimy",
     "feature_modes_desc":       "Režim hraní pro vystoupení, režim přesunu pro přeskládání a režim úprav pro hromadnou správu.",
-    "feature_anchor_title":     "Chytré ukotvení",
-    "feature_anchor_desc":      "Flexibilní bod vložení podporující jak sekvenční, tak fixní pracovní postup.",
+    "feature_anchor_title":     "Chytrý systém ukotvení",
+    "feature_anchor_desc":      "Flexibilní kotva pro rychlé přeuspořádání s možností přidat/přesunout za/před kotvu.",
     "feature_library_title":    "Prohledávatelná knihovna písní",
     "feature_library_desc":     "Filtrujte podle názvu, BPM nebo štítků s podporou T9 klávesnice a pokročilou AND/OR logikou štítků.",
-    "feature_sets_title":       "Přerušení mezi sadami",
-    "feature_sets_desc":        "Organizujte playlist do sad se sbalitelnými hlavičkami a kopírováním sady do schránky.",
+    "feature_sets_title":       "Možnost více setů",
+    "feature_sets_desc":        "Organizujte playlist do přehledných setů s možností kopírováním názvů písní schránky.",
     "feature_live_title":       "Obrazovka Živě",
-    "feature_live_desc":        "Čisté zobrazení pouze pro čtení optimalizované pro projekci nebo sdílenou obrazovku, ukazující aktuální píseň v reálném čase.",
+    "feature_live_desc":        "Zobrazení PDF s notami nebo akordy podobně jako v iReal aplikaci.",
 }

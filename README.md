@@ -126,17 +126,3 @@ flask create-band <name> <addr> <password>
 # Start the server
 python -m livelist.server
 ```
-
-### Existing Databases
-
-If you have an existing database, the `items` table needs the `song_id` column made nullable (break items have no song reference). Apply this SQL:
-
-```sql
--- SQLite
-ALTER TABLE items RENAME COLUMN song_id TO song_id_old;
-ALTER TABLE items ADD COLUMN song_id INTEGER REFERENCES songs(id);
-UPDATE items SET song_id = song_id_old;
-DROP TABLE IF EXISTS _items_backup;  -- cleanup if needed
-```
-
-Or simply recreate the database with `flask init-db` if data loss is acceptable.

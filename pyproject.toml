@@ -26,5 +26,4 @@ packages = [
     "livelist.config",
     "livelist.models",
     "livelist.routes",
-    "livelist.utils",
 ]

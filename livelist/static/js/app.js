@@ -1094,8 +1094,7 @@ function initApplication() {
         livelistEl?.classList.toggle('mode-move', mode === 'move');
         livelistEl?.classList.toggle('mode-edit', mode === 'edit');
 
-        // Nav sections: main nav visible in Play + Move, edit nav in Edit
-        document.getElementById('nav-main').classList.toggle('d-none', mode === 'edit');
+        // Nav sections: edit nav visible only in Edit mode
         document.getElementById('nav-edit').classList.toggle('d-none', mode !== 'edit');
     }
 

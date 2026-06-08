@@ -146,54 +146,59 @@
 </template>
 
 <!-- Navigation -->
-<nav class="navbar bg-body-tertiary navbar-expand sticky-top">
-    <div class="container-fluid">
+<nav class="navbar bg-body-tertiary navbar-expand-md sticky-top">
+    <div class="container-fluid" style="flex-wrap: wrap">
         <div id="playlistHeader">
             <span class="navbar-brand text-muted" id="livelist-name"></span>
             <small class="text-muted ms-2" id="livelist-date"></small>
         </div>
-    </div>
-    <div class="container-fluid mt-2">
-        <div id="nav-main">
-            <button class="btn btn-outline-primary bi bi-list-ul mx-1 mx-lg-2" data-bs-toggle="offcanvas"
-                data-bs-target="#playlist-panel" title="{{ _('nav_playlists') }}">
-                <span class="d-none d-sm-inline">{{ _('nav_playlists') }}</span></button>
-            <a class="btn btn-outline-primary bi bi-file-play mx-1 mx-lg-2"
-                href="{{ url_for('views.play_view', playlist_id=playlist.id) if playlist else '#' }}" target="_blank"
-                title="{{ _('nav_live') }}">
-                <span class="d-none d-sm-inline">{{ _('nav_live') }}</span></a>
-            <button class="btn btn-outline-primary bi bi-question-circle mx-1 mx-lg-2" data-bs-toggle="modal"
-                data-bs-target="#help-modal" title="{{ _('nav_help') }}">
-                <span class="d-none d-sm-inline">{{ _('nav_help') }}</span></button>
+        <button class="navbar-toggler ms-auto" type="button" data-bs-toggle="collapse"
+            data-bs-target="#nav-main-collapse" aria-controls="nav-main-collapse" aria-expanded="false"
+            aria-label="Toggle navigation">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="nav-main-collapse">
+            <div id="nav-main" class="navbar-nav gap-1 mt-2 mt-md-0 ms-md-2">
+                <button class="btn btn-outline-primary bi bi-list-ul" data-bs-toggle="offcanvas"
+                    data-bs-target="#playlist-panel" title="{{ _('nav_playlists') }}">
+                    {{ _('nav_playlists') }}</button>
+                <a class="btn btn-outline-primary bi bi-file-play"
+                    href="{{ url_for('views.play_view', playlist_id=playlist.id) if playlist else '#' }}"
+                    target="_blank" title="{{ _('nav_live') }}">
+                    {{ _('nav_live') }}</a>
+                <button class="btn btn-outline-primary bi bi-question-circle" data-bs-toggle="modal"
+                    data-bs-target="#help-modal" title="{{ _('nav_help') }}">
+                    {{ _('nav_help') }}</button>
+            </div>
         </div>
-        <div id="nav-edit" class="d-none">
-            <button class="btn btn-danger bi bi-trash  xd-none" id="livelist-delete-selected"
+        <div class="d-flex w-100 mt-1 align-items-center">
+            <button class="btn btn-outline-primary bi bi-plus mx-1" data-bs-toggle="offcanvas"
+                data-bs-target="#songlist-panel" id="btn-songlist-panel" title="{{ _('nav_add_song') }}">
+                <span class="d-none d-sm-inline">{{ _('nav_add_song') }}</span></button>
+            <span class="navbar-text text-muted me-2" id="anchor-info">
+                <span class="btn btn-primary btn-sm px-1 py-0" id="anchor-info-pos"></span>
+                <span id="anchor-info-name"></span> <span class="anchor-info-symbol">⚓</span><i id="anchor-info-dir"
+                    class="bi bi-arrow-down"></i>
+            </span>
+            <div class="btn-group ms-auto" id="mode-toggle">
+                <button class="btn btn-primary" id="mode-play" title="{{ _('mode_play') }}"><i
+                        class="bi bi-play-fill"></i>
+                    <span class="d-none d-md-inline">{{ _('mode_play') }}</span></button>
+                <button class="btn btn-outline-primary" id="mode-move" title="{{ _('mode_move') }}"><i
+                        class="bi bi-arrows-move"></i>
+                    <span class="d-none d-md-inline">{{ _('mode_move') }}</span></button>
+                <button class="btn btn-outline-primary" id="mode-edit" title="{{ _('mode_edit') }}"><i
+                        class="bi bi-pencil-fill"></i>
+                    <span class="d-none d-md-inline">{{ _('mode_edit') }}</span></button>
+            </div>
+        </div>
+        <div class="d-flex w-100 mt-1 align-items-center d-none" id="nav-edit">
+            <button class="btn btn-danger bi bi-trash xd-none me-1" id="livelist-delete-selected"
                 title="{{ _('action_delete_selected') }}">{{ _('action_delete_selected') }}</button>
             <button class="btn btn-warning bi bi-sort-numeric-down" id="edit-sort"
                 title="{{ _('action_update_order') }}">{{ _('action_update_order') }}</button>
         </div>
-    </div>
-    <div class="container-fluid mt-1">
-        <span class="navbar-text text-muted me-2" id="anchor-info">
-            <span class="btn btn-primary btn-sm px-1 py-0" id="anchor-info-pos"></span>
-            <span id="anchor-info-name"></span> <span class="anchor-info-symbol">⚓</span><i id="anchor-info-dir"
-                class="bi bi-arrow-down"></i>
-        </span>
-        <button class="btn btn-outline-primary bi bi-plus mx-1" data-bs-toggle="offcanvas"
-            data-bs-target="#songlist-panel" id="btn-songlist-panel" title="{{ _('nav_add_song') }}">
-            <span class="d-none d-sm-inline">{{ _('nav_add_song') }}</span></button>
-        <div class="btn-group btn-group ms-auto" id="mode-toggle">
-            <button class="btn btn-primary" id="mode-play" title="{{ _('mode_play') }}"><i class="bi bi-play-fill"></i>
-                <span class="d-none d-md-inline">{{ _('mode_play') }}</span></button>
-            <button class="btn btn-outline-primary" id="mode-move" title="{{ _('mode_move') }}"><i
-                    class="bi bi-arrows-move"></i>
-                <span class="d-none d-md-inline">{{ _('mode_move') }}</span></button>
-            <button class="btn btn-outline-primary" id="mode-edit" title="{{ _('mode_edit') }}"><i
-                    class="bi bi-pencil-fill"></i>
-                <span class="d-none d-md-inline">{{ _('mode_edit') }}</span></button>
-        </div>
-    </div>
-    <!-- Selection events: sort, cut (and move to another position / playlist) -->
+        <!-- Selection events: sort, cut (and move to another position / playlist) -->
 </nav>
 
 <div class="container-fluid">

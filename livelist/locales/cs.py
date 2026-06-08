@@ -56,6 +56,9 @@ TRANSLATIONS: dict[str, str] = {
     # ---- Systém ukotvení ----
     "anchor_label":         "Kotva",
 
+    # ---- Přepínač číslování ----
+    "numbering_toggle":    "Přepnout číslování: globální / podle setu",
+
     # ---- Popisy sad / přerušení ----
     "set_label":            "Set {n}",
 

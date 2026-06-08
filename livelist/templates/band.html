@@ -60,6 +60,9 @@
 
 <template id="livelist-break-template">
     <li class="livelist-break list-group-item d-flex align-items-center gap-2 py-2">
+        <button class="btn btn-outline-primary bi bi-clipboard clipboard-copy-break-set-left d-none"
+            title="Copy set"></button>
+        <span class="btn btn-outline-primary livelist-break-selectbox d-none">&nbsp;</span>
         <div class="d-flex align-items-center gap-2 flex-grow-1">
             <button class="btn bi bi-chevron-down livelist-break-collapse" title="Collapse set"></button>
             <span class="fw-bold livelist-break-label">Set 2</span>
@@ -76,8 +79,6 @@
             <span class="btn bi bi-grip-vertical livelist-break-grip drag-handle d-none"></span>
             <button class="btn btn-outline-danger bi bi-trash livelist-break-delete d-none"
                 title="Delete break"></button>
-            <button class="btn btn-outline-primary bi bi-clipboard clipboard-copy-break-set d-none"
-                title="Copy set"></button>
         </div>
     </li>
 </template>
@@ -162,6 +163,9 @@
                 <button class="btn btn-outline-primary bi bi-list-ul" data-bs-toggle="offcanvas"
                     data-bs-target="#playlist-panel" title="{{ _('nav_playlists') }}">
                     {{ _('nav_playlists') }}</button>
+                <button class="btn btn-outline-secondary" id="numbering-toggle"
+                    title="{{ _('numbering_toggle') }}">
+                    <span id="numbering-label">1..N</span> <i id="numbering-icon" class="bi bi-arrow-right"></i></button>
                 <a class="btn btn-outline-primary bi bi-file-play"
                     href="{{ url_for('views.play_view', playlist_id=playlist.id) if playlist else '#' }}"
                     target="_blank" title="{{ _('nav_live') }}">
@@ -180,6 +184,7 @@
                 <span id="anchor-info-name"></span> <span class="anchor-info-symbol">⚓</span><i id="anchor-info-dir"
                     class="bi bi-arrow-down"></i>
             </span>
+
             <div class="btn-group ms-auto" id="mode-toggle">
                 <button class="btn btn-primary" id="mode-play" title="{{ _('mode_play') }}"><i
                         class="bi bi-play-fill"></i>

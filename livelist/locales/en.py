@@ -56,6 +56,9 @@ TRANSLATIONS: dict[str, str] = {
     # ---- Anchor system labels ----
     "anchor_label":         "Anchor",
 
+    # ---- Numbering toggle ----
+    "numbering_toggle":    "Toggle numbering: global / per-set",
+
     # ---- Set / break labels ----
     "set_label":            "Set {n}",
 

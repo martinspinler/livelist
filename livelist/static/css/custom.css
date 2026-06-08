@@ -34,6 +34,13 @@
     text-align: center;
 }
 
+/* Break selectbox (left side) sizing — align with item position */
+.livelist-break-selectbox,
+.clipboard-copy-break-set-left {
+    min-width: 3.0em;
+    text-align: center;
+}
+
 /* Anchor direction indicators */
 .anchor-dir-down,
 .anchor-dir-up {
@@ -181,6 +188,13 @@
     cursor: default;
 }
 
+/* Set 1 selectbox — disabled placeholder so it aligns with other break selectboxes */
+.livelist-break .set1-select-disabled {
+    opacity: 0.3;
+    pointer-events: none;
+    cursor: not-allowed;
+}
+
 
 /* Song list styling */
 .song-item.selected {
@@ -197,6 +211,14 @@
 
 #songlist-panel-edit {
     margin-left: auto;
+}
+
+/* Song list tag spacing */
+.songlist-item-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25em;
+    margin-top: 0.15em;
 }
 
 /* Song list edit */

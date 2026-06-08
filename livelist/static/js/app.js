@@ -36,6 +36,7 @@ function initApplication() {
         allTags: new Map(),
 
         collapsedSets: new Set(),
+        numberingPerSet: false,
         /*socket_auth: {
             auth: {
                 band: null,
@@ -111,6 +112,42 @@ function initApplication() {
         const list_e = document.getElementById('livelist-items')
         const prevAnchor = state.anchorItem;
 
+        // Before clearing the DOM, determine fallback anchor if current one is being deleted
+        let fallbackInfo = null; // {itemId: string} or {setKey: string}
+        if (prevAnchor != null) {
+            const anchorId = prevAnchor.dataset.itemId;
+            // Set 1 (no numeric itemId) is never deleted, so only check real items/breaks
+            if (anchorId && !msg.items.some(item => String(item.id) === String(anchorId))) {
+                let adjacentEl = null;
+                const isItem = (el) => el.classList.contains('livelist-item') || el.classList.contains('livelist-break');
+
+                if (state.anchorItemSticky) {
+                    // Points up → anchor to previous item
+                    let el = prevAnchor.previousElementSibling;
+                    while (el && !isItem(el)) { el = el.previousElementSibling; }
+                    adjacentEl = el;
+                } else {
+                    // Points down → anchor to next item
+                    let el = prevAnchor.nextElementSibling;
+                    while (el && !isItem(el)) { el = el.nextElementSibling; }
+                    if (!el) {
+                        // No next item (was last) → go to previous
+                        el = prevAnchor.previousElementSibling;
+                        while (el && !isItem(el)) { el = el.previousElementSibling; }
+                    }
+                    adjacentEl = el;
+                }
+
+                if (adjacentEl) {
+                    if (adjacentEl.dataset.itemId) {
+                        fallbackInfo = { itemId: adjacentEl.dataset.itemId };
+                    } else if (adjacentEl.dataset.setKey) {
+                        fallbackInfo = { setKey: adjacentEl.dataset.setKey };
+                    }
+                }
+            }
+        }
+
         list_e.innerHTML = "";
 
         // Pre-scan: count breaks to assign set numbers and song counts per set
@@ -149,11 +186,15 @@ function initApplication() {
         // Move-to-anchor is not applicable to Set 1
         set1_e.querySelector('.drag-handle')?.classList.add('set1-grip-disabled');
         set1_e.querySelector('.livelist-break-delete')?.classList.add('set1-delete-disabled');
+        const set1Selectbox = set1_e.querySelector('.livelist-break-selectbox');
+        set1Selectbox?.classList.add('set1-select-disabled');
+        if (set1Selectbox) set1Selectbox.textContent = '\u00A0';
         set1_e.querySelector('.livelist-break-move-to-anchor')?.remove();
 
         // Show anchor on Set 1 if anchorItem points to this element (from previous render)
         if (state.anchorItem != null && state.anchorItem.dataset.setKey === SET1_KEY) {
             set1_e.querySelector('.livelist-item-anchor').classList.remove('d-none');
+            state.anchorItem = set1_e;
         }
 
         list_e.appendChild(set1_e);
@@ -162,6 +203,7 @@ function initApplication() {
         let setNumber = 1;
         let currentBreakId = SET1_KEY; // Set 1 is the current "break" until a real break appears
         let songIndex = 0;
+        let setSongIndex = 0;   // per-set counter, reset at each break
 
         msg.items.forEach(
             item => {
@@ -169,6 +211,7 @@ function initApplication() {
                     // Render break separator
                     setNumber = breakSetMap[item.id];
                     currentBreakId = item.id;
+                    setSongIndex = 0;
 
                     const tmpl = document.getElementById("livelist-break-template").content.cloneNode(true);
                     const break_e = tmpl.querySelector('.livelist-break');
@@ -204,6 +247,8 @@ function initApplication() {
                     item_e.dataset.itemId = item.id;
                     item_e.dataset.songId = item.song_id;
                     item_e.dataset.setNumber = setNumber;
+                    item_e.dataset.posGlobal = songIndex + 1;
+                    item_e.dataset.posPerSet = setSongIndex + 1;
 
                     if (song) {
                         item_e.querySelector('.song-name').textContent = song.name;
@@ -211,7 +256,8 @@ function initApplication() {
                         item_e.querySelector('.song-user_id').textContent =
                             (song.user_id ? song.user_id + ' - ' : '') + (song.notes || '');
                     }
-                    item_e.querySelector('.livelist-item-position').textContent = songIndex + 1;
+                    item_e.querySelector('.livelist-item-position').textContent =
+                        state.numberingPerSet ? setSongIndex + 1 : songIndex + 1;
 
                     // Hide if parent set is collapsed
                     if (currentBreakId && state.collapsedSets.has(currentBreakId)) {
@@ -220,6 +266,7 @@ function initApplication() {
 
                     list_e.appendChild(item_e);
                     songIndex++;
+                    setSongIndex++;
 
                     if (prevAnchor != null && item.id == prevAnchor.dataset.itemId) {
                         state.anchorItem = item_e;
@@ -237,7 +284,20 @@ function initApplication() {
             }
         );
 
+        // Resolve anchor element — if the anchored item was deleted, use the fallback
         let ai = state.anchorItem;
+        if (ai != null && !document.body.contains(ai)) {
+            if (fallbackInfo) {
+                if (fallbackInfo.itemId) {
+                    ai = list_e.querySelector(`[data-item-id="${fallbackInfo.itemId}"]`);
+                } else if (fallbackInfo.setKey) {
+                    ai = list_e.querySelector(`[data-set-key="${fallbackInfo.setKey}"]`);
+                }
+            } else {
+                ai = null;
+            }
+        }
+
         if (state.lastAction == "add_song") {
             if (!state.anchorItemSticky) {
                 if (ai == null) {
@@ -281,6 +341,37 @@ function initApplication() {
                 position.classList.toggle('btn-outline-primary', state.editMode);
             }
         });
+
+        // Break items: update selectbox styling based on selection
+        document.querySelectorAll(".livelist-break").forEach(brk => {
+            const breakId = parseInt(brk.dataset.itemId);
+            if (!breakId) return; // Skip Set 1 (no numeric itemId)
+            const pos = state.selection.indexOf(breakId);
+            const selectbox = brk.querySelector('.livelist-break-selectbox');
+            if (selectbox && !selectbox.classList.contains('set1-select-disabled')) {
+                const isSelected = pos != -1;
+                selectbox.textContent = isSelected ? String(pos + 1) : '\u00A0';
+                selectbox.classList.toggle('btn-outline-primary', !isSelected);
+                selectbox.classList.toggle('btn-warning', isSelected);
+            }
+            brk.classList.toggle('list-group-item-warning', pos != -1);
+        });
+    }
+
+    function refreshPositionNumbers() {
+        const key = state.numberingPerSet ? 'posPerSet' : 'posGlobal';
+        document.querySelectorAll(".livelist-item").forEach(item => {
+            const position = item.querySelector(".livelist-item-position");
+            if (position && item.dataset[key]) {
+                // Only update if not showing a selection number
+                const selectbox = item.querySelector(".livelist-item-selectbox");
+                const isShowingSelection = selectbox && !selectbox.classList.contains('d-none');
+                if (!isShowingSelection) {
+                    position.textContent = item.dataset[key];
+                }
+            }
+        });
+        update_anchor_info();
     }
 
     function livelist_item_set_anchor(pi, user_action = false) {
@@ -345,7 +436,11 @@ function initApplication() {
         } else {
             const position = state.anchorItem.querySelector('.livelist-item-position');
             const name = state.anchorItem.querySelector('.song-name');
-            posEl.textContent = position ? position.textContent : '';
+            if (state.numberingPerSet && state.anchorItem.dataset.posPerSet) {
+                posEl.textContent = 'S' + state.anchorItem.dataset.setNumber + '/' + state.anchorItem.dataset.posPerSet;
+            } else {
+                posEl.textContent = position ? position.textContent : '';
+            }
             nameEl.textContent = name ? name.textContent : '';
             dirEl.className = state.anchorItemSticky ? 'bi bi-arrow-up' : 'bi bi-arrow-down';
         }
@@ -700,6 +795,12 @@ function initApplication() {
         document.getElementById('mode-move')?.addEventListener('click', () => setViewMode('move'));
         document.getElementById('mode-edit')?.addEventListener('click', () => setViewMode('edit'));
 
+        document.getElementById('numbering-toggle')?.addEventListener('click', () => {
+            state.numberingPerSet = !state.numberingPerSet;
+            updateNumberingToggle();
+            refreshPositionNumbers();
+        });
+
         document.querySelectorAll('.keypad-btn').forEach(btn => {
             btn.addEventListener('click', handleKeypadButton);
         });
@@ -929,8 +1030,14 @@ function initApplication() {
                     if (breakId) {
                         handle_move_to_anchor(breakId);
                     }
-                } else if (target.closest('.clipboard-copy-break-set')) {
+                } else if (target.closest('.clipboard-copy-break-set-left')) {
                     copySetToClipboard(setKey || breakId);
+                    e.stopPropagation();
+                } else if (target.closest('.livelist-break-selectbox')) {
+                    // In edit mode, toggle selection for break items
+                    if (breakId && state.editMode) {
+                        handle_livelist_item_number(livelist_break, breakId);
+                    }
                     e.stopPropagation();
                 } else {
                     // Clicking a break header sets the anchor on this break
@@ -980,6 +1087,24 @@ function initApplication() {
                 filterSongs();
             }
         });
+    }
+
+    function updateNumberingToggle() {
+        const btn = document.getElementById('numbering-toggle');
+        const label = document.getElementById('numbering-label');
+        const icon = document.getElementById('numbering-icon');
+        if (!btn || !label) return;
+        if (state.numberingPerSet) {
+            label.textContent = '1..N';
+            if (icon) { icon.className = 'bi bi-repeat'; }
+            btn.classList.toggle('btn-outline-secondary', false);
+            btn.classList.toggle('btn-outline-primary', true);
+        } else {
+            label.textContent = '1..N';
+            if (icon) { icon.className = 'bi bi-arrow-right'; }
+            btn.classList.toggle('btn-outline-secondary', true);
+            btn.classList.toggle('btn-outline-primary', false);
+        }
     }
 
     function setViewMode(mode) {
@@ -1046,9 +1171,14 @@ function initApplication() {
             btn.classList.toggle('d-none', mode !== 'play');
         });
 
-        // Break clipboard/copy buttons: Play mode only (replaces play button position)
-        document.querySelectorAll('.clipboard-copy-break-set').forEach(btn => {
-            btn.classList.toggle('d-none', mode !== 'play');
+        // Break clipboard/copy button (left side): Play and Move mode
+        document.querySelectorAll('.clipboard-copy-break-set-left').forEach(btn => {
+            btn.classList.toggle('d-none', mode === 'edit');
+        });
+
+        // Break selectbox (left side): Edit mode only
+        document.querySelectorAll('.livelist-break-selectbox').forEach(btn => {
+            btn.classList.toggle('d-none', mode !== 'edit');
         });
 
         // Move-to-anchor: Move mode, non-anchor items

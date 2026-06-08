@@ -4,7 +4,7 @@ import json
 import datetime
 from datetime import datetime as dt
 
-from flask import Flask, render_template, session
+from flask import Flask, render_template, session, current_app, request
 from flask_socketio import SocketIO, emit, join_room, leave_room
 
 from sqlalchemy import and_, desc
@@ -53,14 +53,30 @@ def inject_l10n():
     - ``l10n`` — the full translations dict for the detected language
     - ``lang`` — the detected language code (e.g. ``"en"``, ``"cs"``)
     - ``supported_langs`` — list of available language codes
+    - ``home_url`` — URL of the main/index page (bare domain, no subdomain)
     """
     lang = detect_language()
     translations = get_translations(lang)
+
+    # Compute home URL: scheme + first configured bare domain
+    home_url = None
+    domains = current_app.config.get("DOMAINS", [])
+    if domains:
+        scheme = request.scheme
+        host = request.host.split(":")[0]
+        # If currently on a subdomain, link to the bare domain;
+        # otherwise (already on bare domain) just use "/".
+        if host not in domains:
+            home_url = f"{scheme}://{domains[0]}"
+        else:
+            home_url = "/"
+
     return {
         "_": lambda key, **kw: _t(key, translations, **kw),
         "l10n": translations,
         "lang": lang,
         "supported_langs": get_supported_langs(),
+        "home_url": home_url or "/",
     }
 
 

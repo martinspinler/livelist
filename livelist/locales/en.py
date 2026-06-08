@@ -2,6 +2,7 @@
 
 TRANSLATIONS: dict[str, str] = {
     # ---- Navigation bar ----
+    "nav_home":           "Home",
     "nav_add_song":       "Add Song",
     "nav_playlists":      "Playlists",
     "nav_live":           "Live",

@@ -2,6 +2,7 @@
 
 TRANSLATIONS: dict[str, str] = {
     # ---- Navigační lišta ----
+    "nav_home":           "Domů",
     "nav_add_song":       "Přidat píseň",
     "nav_playlists":      "Playlisty",
     "nav_live":           "Živě",

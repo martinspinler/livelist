@@ -9,11 +9,12 @@ from flask import Flask, render_template, session, current_app, request
 from flask_socketio import SocketIO, emit, join_room, leave_room
 
 from sqlalchemy import and_, desc
+from dotenv import load_dotenv
 
 from .config.settings import Config
 from .models import Band, Song, Playlist, PlaylistItem, Tag, db
 from .routes import views_bp
-from .routes.views import get_privileges, get_default_playlist
+from .routes.views import get_privileges, get_default_playlist, find_documents_by_song
 from .l10n import t as _t, get_translations, detect_language, get_supported_langs
 
 # Language code → POSIX locale used for locale-aware sorting
@@ -52,7 +53,6 @@ def _locale_sort_key(name: str) -> str:
 # TODO: Play screen: do not switch played song immediately, let user to confirm
 
 # Load .env file (if present) before building the app config
-from dotenv import load_dotenv
 load_dotenv()
 
 # Initialize Flask app
@@ -365,6 +365,17 @@ def handle_play_item(data: dict):
     playlist.active_item_id = item_id
     db.session.commit()
 
+    # Build documents data for the play view
+    song_data = {}
+    if item and item.song:
+        song = item.song
+        documents = find_documents_by_song(song)
+        song_data = {
+            'song_id': song.id,
+            'song_name': song.name,
+            'documents': documents,
+        }
+
     # Broadcast play event
     emit(
         "item_played",
@@ -372,6 +383,7 @@ def handle_play_item(data: dict):
             "playlist_id": playlist_id,
             "item_id": item_id,
             "timestamp": dt.now(datetime.timezone.utc).isoformat(),
+            **song_data,
         },
         to=f"band_{band.id}",
     )

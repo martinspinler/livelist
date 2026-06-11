@@ -6,6 +6,7 @@
 <script type="text/javascript" src="{{ url_for('static', filename='js/socket.io.min.js') }}"></script>
 <script type="text/javascript" src="{{ url_for('static', filename='js/app.js') }}"></script>
 <script type="text/javascript" src="{{ url_for('static', filename='js/dnd.js') }}"></script>
+<script type="text/javascript" src="{{ url_for('static', filename='js/fullscreen.js') }}"></script>
 <script type="text/javascript" src="/api/init.js?band={{ band.addr }}&key={{ auth_key }}"></script>
 {% endblock %}
 
@@ -171,11 +172,13 @@
                     <span id="numbering-label">1..N</span> <i id="numbering-icon" class="bi bi-arrow-right"></i></button>
                 <a class="btn btn-outline-primary bi bi-file-play"
                     href="{{ url_for('views.play_view', playlist_id=playlist.id) if playlist else '#' }}"
-                    target="_blank" title="{{ _('nav_live') }}">
+                    title="{{ _('nav_live') }}">
                     {{ _('nav_live') }}</a>
                 <button class="btn btn-outline-primary bi bi-question-circle" data-bs-toggle="modal"
                     data-bs-target="#help-modal" title="{{ _('nav_help') }}">
                     {{ _('nav_help') }}</button>
+                <button class="btn btn-outline-primary bi bi-arrows-fullscreen" id="btn-fullscreen"
+                    title="Fullscreen"></button>
             </div>
         </div>
         <div class="d-flex w-100 mt-1 align-items-center">
@@ -481,5 +484,6 @@
     };
     jinja_update(state);
     initApplication();
+    initFullscreenToggle('btn-fullscreen');
 </script>
 {% endblock %}

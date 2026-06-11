@@ -19,6 +19,10 @@ class Config:
     # Set via LIVELIST_DOMAINS env var.
     # For local dev with /etc/hosts use something like 'livelist.dev'.
     DOMAINS = list(filter(None, os.environ.get("LIVELIST_DOMAINS", "").split(":")))
+    SHEET_STORE_PATH = os.environ.get("LIVELIST_SHEET_STORE_PATH")
+
+    SHEET_STORES = {
+    }
 
 
 class DevelopmentConfig(Config):

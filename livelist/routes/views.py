@@ -2,13 +2,216 @@
 HTML views for Livelist
 """
 
+import os
+import subprocess
+from pathlib import Path
+from dataclasses import asdict, dataclass, field
+from typing import Any, Optional, TypedDict
+
 import flask.json
-from typing import Any, Optional
-from flask import redirect, render_template, request, url_for, make_response
+
+from flask import redirect, render_template, request, url_for, make_response, send_file, abort, current_app
 from datetime import date
 
-from ..models import Band, Playlist, db
+
+
+from ..models import Band, Playlist, PlaylistItem, Song, db
 from . import views_bp
+
+
+# --- Sheet music / lyrics helpers ---
+
+IMG_CACHE_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'cache')
+
+RENDERING_LABELS = {'pdf': 'Sheet', 'text': 'Lyrics', 'ireal': 'iReal'}
+
+@dataclass
+class Pattern:
+    id: str
+    render: str
+    pattern: str
+    label: str
+    instr: list[str] = field(default_factory=list)
+
+
+@dataclass
+class Instrument:
+    id: str
+    name: str
+    patterns: list[str]
+    prio: Optional[list[str]] = None
+
+
+@dataclass
+class Store:
+    patterns: dict[str, Pattern]
+    instruments: dict[str, Instrument]
+    prefix: str
+
+
+def _effective_suffix_idx(
+    suffix_idx: int,
+    instr_suffixes: list,
+    template: str,
+    has_instr_placeholder: bool,
+    pat_instr: Optional[list],
+    instr_id: str,
+    patterns: dict[str, Pattern],
+    prio: list[str],
+    pat: Pattern
+) -> int:
+    """Compute the effective suffix index for auto-select priority.
+
+    The returned integer determines how the client ranks this document for
+    a given instrument (lower = higher priority).
+
+    Three cases:
+
+    1. Pattern HAS ``{instrument}`` placeholder → the suffix was actually
+       used in the filename, so its real position (suffix_idx) is the
+       priority.
+
+    2. Pattern LACKS ``{instrument}`` AND has an explicit ``instr`` list
+       in the pattern config (e.g. ``["voc"]`` on a lyrics PDF):
+       - If instr_id IS in that list → eff_idx = 0 (high priority for
+         this instrument; pattern order among equal indices resolves
+         specific-vs-generic ties since specific patterns are listed
+         earlier in the config).
+       - If instr_id is NOT in that list → eff_idx = len(suffixes)
+         (low priority fallback).
+
+    3. Pattern LACKS ``{instrument}`` AND has NO ``instr`` list →
+       heuristic: scan all suffixes and check if any stripped suffix
+       string appears in the template path (e.g. suffix ' - Lyrics'
+       matches ``0_Lyrics/{name}.pdf``).  If found, use that suffix's
+       index; otherwise fall back to len(suffixes).
+    """
+    for i, p in enumerate(prio):
+        if p == pat.id:
+            return i
+
+    if has_instr_placeholder:
+        return suffix_idx
+
+    # Generic pattern — check explicit instr list first
+    if pat_instr is not None:
+        if instr_id in pat_instr:
+            return 0
+        return len(instr_suffixes)
+
+    # No explicit instr: heuristic — match suffix keywords against path
+    for si, sfx in enumerate(instr_suffixes):
+        stripped = sfx.lstrip(' -')
+        if stripped and stripped in template:
+            return si
+
+    return len(instr_suffixes)
+
+def _get_store(band: Band) -> Store:
+    band_addr = band.addr
+    _prefix = current_app.config.get("SHEET_STORE_PATH")
+    store = current_app.config.get("SHEET_STORES", {}).get(band_addr)
+
+    patterns = {k: Pattern(id=k, **v) for k, v in store.get('patterns', {}).items()}
+    instruments = {k: Instrument(id=k, **v) for k, v in store.get('instruments', {}).items()}
+    prefix: str = "" if _prefix is None else str(_prefix).format(band=band_addr)
+    return Store(patterns, instruments, prefix)
+
+
+def find_documents_by_song(song: Song) -> list:
+    """Find all unique documents for a song by iterating patterns × instruments.
+
+    Returns a list of document dicts, each with:
+      pattern_id          – id of the pattern that produced this file
+      render              – render type ("pdf", "text")
+      path                – file path relative to the store prefix
+      instruments_matched – {instr_id: suffix_index} mapping; the suffix_index
+                            determines auto-select priority on the client
+                            (lower = higher priority).  See _effective_suffix_idx.
+      label               – human-readable label from the pattern config
+
+    Documents are deduplicated by absolute file path.  When two pattern×instrument
+    combinations resolve to the same file, their matched instruments are merged
+    and the first pattern's id/label is kept.
+    """
+
+    st = _get_store(song.band)
+
+    seen = {}  # abs_path → document dict
+
+    # Name candidates: prefer song.filename (covers case-sensitive variants
+    # like "All Of Me" vs "All of Me"), fall back to song.name.
+    name_candidates = [song.filename] if song.filename else []
+    if song.name not in name_candidates:
+        name_candidates.append(song.name)
+
+    for idx, pat in enumerate(st.patterns.values()):
+        template = pat.pattern
+        label = pat.label
+        has_instr_placeholder = '{instrument}' in template
+
+        for instr in st.instruments.values():
+            for suffix_idx, suffix in enumerate(instr.patterns):
+                matched_rel = None
+                matched_abs = None
+                for name in name_candidates:
+                    candidate_rel = template.format(name=name, instrument=suffix)
+                    candidate_abs = st.prefix + candidate_rel
+                    #print(candidate_abs)
+                    if os.path.isfile(candidate_abs):
+                        matched_rel = candidate_rel
+                        matched_abs = candidate_abs
+                        break
+                if matched_abs is None:
+                    continue
+                eff_idx = _effective_suffix_idx(
+                    suffix_idx, instr.patterns, template,
+                    has_instr_placeholder, pat.instr, instr.id, st.patterns, instr.prio, pat
+                )
+                if matched_abs not in seen:
+                    seen[matched_abs] = {
+                        'pattern_id': pat.id,
+                        'render': pat.render,
+                        'path': matched_rel,
+                        'instruments_matched': {instr.id: eff_idx},
+                        'label': label or pat.id,
+                    }
+                else:
+                    doc = seen[matched_abs]
+                    if instr.id not in doc['instruments_matched']:
+                        doc['instruments_matched'][instr.id] = eff_idx
+                break  # first matching suffix per instrument is enough
+
+    return list(seen.values())
+
+
+def resolve_document(song: Song, pattern_id: str, instr_id: str) -> Optional[str]:
+    """Resolve a specific document file for serving.
+
+    Given a pattern_id and instr_id, tries that instrument's suffixes with
+    the pattern template until an existing file is found. Returns the
+    absolute file path, or None.
+    """
+    st = _get_store(song.band)
+
+    pat = st.patterns.get(pattern_id)
+    instr = st.instruments.get(instr_id)
+
+    if pat is None or instr is None:
+        return None
+
+    template = pat.pattern
+    name_candidates = [song.filename] if song.filename else []
+    if song.name not in name_candidates:
+        name_candidates.append(song.name)
+    for suffix in instr.patterns:
+        for name in name_candidates:
+            candidate_rel = template.format(name=name, instrument=suffix)
+            candidate_abs = st.prefix + candidate_rel
+            if os.path.isfile(candidate_abs):
+                return candidate_abs
+
+    return None
 
 
 def get_privileges(band_name, key):
@@ -36,7 +239,6 @@ def _get_domains() -> list[str]:
 
     Falls back to empty list when DOMAINS is not configured.
     """
-    from flask import current_app
     return current_app.config.get("DOMAINS", [])
 
 
@@ -84,6 +286,24 @@ def _set_auth_cookie(response, auth_cookie):
     if domain:
         kwargs["domain"] = domain
     response.set_cookie('auth_data_simple', flask.json.dumps(auth_cookie), **kwargs)
+    return response
+
+
+def _get_instr_pref(band_addr: str) -> Optional[str]:
+    """Read the preferred instrument for a band from the cookie."""
+    prefs = flask.json.loads(request.cookies.get('instr_pref', '{}'))
+    return prefs.get(band_addr)
+
+
+def _set_instr_cookie(response, band_addr: str, instr_id: str):
+    """Set the instrument preference cookie (per-band)."""
+    prefs = flask.json.loads(request.cookies.get('instr_pref', '{}'))
+    prefs[band_addr] = instr_id
+    domain = _get_cookie_domain()
+    kwargs: dict[str, Any] = {"max_age": 60 * 60 * 24 * 365 * 2}
+    if domain:
+        kwargs["domain"] = domain
+    response.set_cookie('instr_pref', flask.json.dumps(prefs), **kwargs)
     return response
 
 
@@ -221,11 +441,75 @@ def view_band_noredirect(band):
 
 @views_bp.route("/play/<int:playlist_id>/")
 def play_view(playlist_id: int):
-    """Live view for a playlist"""
+    """Live play view for a playlist — reacts to ``item_played`` via Socket.IO.
+
+    Bootstraps the page with the currently active item so the user sees
+    something immediately, then hands over to the Socket.IO client which
+    updates in real-time when the server broadcasts ``item_played``.
+    """
     playlist = db.session.get_one(Playlist, playlist_id)
     band = playlist.band
 
-    return render_template("play.html", band=band, playlist=playlist)
+    # Auth key for Socket.IO connection (same as band view)
+    key = check_privileges(band.addr)
+    if key is None:
+        return make_response(redirect('/?auth_failed'))
+
+    # Instrument definitions from store config (for instrument selector)
+    st = _get_store(band)
+
+    # Build a list of song-carrying items (skip breaks) for navigation
+    items = (
+        db.session.query(PlaylistItem)
+        .filter_by(playlist_id=playlist_id)
+        .order_by(PlaylistItem.position)
+        .all()
+    )
+    song_items = []
+    for item in items:
+        if item.song_id is None:
+            continue
+        song = item.song
+        if song is None:
+            continue
+        documents = find_documents_by_song(song)
+
+        song_items.append({
+            'id': item.id,
+            'song_id': song.id,
+            'song_name': song.name,
+            'position': item.position,
+            'documents': documents,
+        })
+
+    # Resolve the currently active item
+    active_item_id = playlist.active_item_id
+    active_song = None
+    active_documents = []
+    if active_item_id:
+        pli = db.session.get(PlaylistItem, active_item_id)
+        if pli and pli.song:
+            active_song = pli.song
+            # Reuse documents from song_items if already probed
+            existing = next((s for s in song_items if s['id'] == active_item_id), None)
+            active_documents = existing['documents'] if existing else find_documents_by_song(active_song)
+
+    store_instruments = {i.id: i.name for i in st.instruments.values()}
+    instr_pref = _get_instr_pref(band.addr) or ''
+
+    return render_template(
+        "play.html",
+        band=band,
+        playlist=playlist,
+        song_items=song_items,
+        active_item_id=active_item_id,
+        active_song=active_song,
+        active_documents=active_documents,
+        store_instruments=store_instruments,
+        rendering_labels=RENDERING_LABELS,
+        auth_key=key,
+        instr_pref=instr_pref,
+    )
 
 
 @views_bp.route("/band-selection/")
@@ -233,6 +517,14 @@ def band_selection():
     """Band selection page"""
     bands = db.session.query(Band).all()
     return render_template("band_selection.html", bands=bands)
+
+
+@views_bp.route("/api/instr-pref/<band_addr>", methods=["POST"])
+def set_instr_pref(band_addr: str):
+    """Save the preferred instrument for a band into a cookie."""
+    instr_id = request.form.get("instr_id", "")
+    resp = make_response("ok", 200)
+    return _set_instr_cookie(resp, band_addr, instr_id)
 
 
 @views_bp.route("/select-band/<int:band_id>/")
@@ -244,15 +536,74 @@ def select_band(band_id: int):
     return redirect(url_for("views.index", band=band.addr))
 
 
-@views_bp.route("/sheets/<path:song_name>/")
-def sheet_view(song_name: str):
-    """View sheet music for a song"""
-    band = _get_current_band()
-    if not band:
-        return redirect(url_for("views.band_selection"))
+@views_bp.route("/sheets/<int:song_id>/<pattern_id>/<instr_id>/<int:page>.jpg")
+@views_bp.route("/sheets/<int:song_id>/<pattern_id>/<instr_id>/<int:page>")
+def sheet_view(song_id: int, pattern_id: str, instr_id: str, page: int):
+    """Serve a single sheet-music page as JPEG.
 
-    # This is a simplified version - in the original, it served PDF files
-    return render_template("sheet.html", band=band, song_name=song_name)
+    URL pattern: ``/sheets/<song_id>/<pattern_id>/<instr_id>/<page>.jpg``
+
+    Locates the source PDF via ``resolve_document``, converts the requested
+    page to JPEG (caching the result on disk), and returns the image.
+    """
+    song = db.session.get(Song, song_id)
+    if song is None:
+        abort(404)
+
+    filename = resolve_document(song, pattern_id, instr_id)
+    if not filename:
+        abort(404)
+
+    # Ensure cache directory exists
+    os.makedirs(IMG_CACHE_PATH, exist_ok=True)
+    cache_key = f'{song_id}-{pattern_id}-{instr_id}-{page}'
+    cache_prefix = os.path.join(IMG_CACHE_PATH, cache_key)
+    cached_file = f'{cache_prefix}.jpg'
+
+    # Convert the requested PDF page to JPEG (cached)
+    if not Path(cached_file).is_file():
+        try:
+            cmd = f'pdftoppm -jpeg -singlefile -f {page} -l {page} "{filename}" {cache_prefix}'
+            subprocess.check_output(cmd, shell=True)
+        except subprocess.CalledProcessError:
+            abort(500)
+
+    if not Path(cached_file).is_file():
+        abort(404)
+
+    return send_file(cached_file, mimetype='image/jpeg')
+
+
+@views_bp.route("/lyrics/<int:song_id>/<pattern_id>/<instr_id>")
+def lyrics_view(song_id: int, pattern_id: str, instr_id: str):
+    """Serve lyrics for a song as an HTML fragment.
+
+    Locates a .txt file via ``resolve_document``, splits it into paragraphs
+    on blank lines, and renders each paragraph (preserving intra-paragraph
+    line breaks) as HTML.
+    """
+    song = db.session.get(Song, song_id)
+    if song is None:
+        abort(404)
+
+    filename = resolve_document(song, pattern_id, instr_id)
+    if not filename:
+        abort(404)
+
+    try:
+        with open(filename, 'r', encoding='utf-8') as f:
+            content = f.read()
+    except OSError:
+        abort(500)
+
+    # Split on blank lines into paragraphs; preserve line breaks within
+    paragraphs = []
+    for raw_para in content.split('\n\n'):
+        lines = [line for line in raw_para.splitlines() if line.strip()]
+        if lines:
+            paragraphs.append(lines)
+
+    return render_template("lyrics.html", paragraphs=paragraphs)
 
 
 # Helper function to get current band (duplicated from app.py for views)

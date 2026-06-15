@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import click
 import json
+import locale
 import datetime
 from datetime import datetime as dt
 
@@ -14,6 +15,37 @@ from .models import Band, Song, Playlist, PlaylistItem, Tag, db
 from .routes import views_bp
 from .routes.views import get_privileges, get_default_playlist
 from .l10n import t as _t, get_translations, detect_language, get_supported_langs
+
+# Language code → POSIX locale used for locale-aware sorting
+_LOCALE_MAP = {
+    "cs": "cs_CZ.UTF-8",
+    "en": "C.UTF-8",
+}
+
+# Cached locale state: once we've set LC_COLLATE for a language,
+# subsequent calls reuse it without switching again.
+_collate_locale = None
+
+
+def _locale_sort_key(name: str) -> str:
+    """Return a sort key that respects the current request's language.
+
+    Uses :func:`locale.strxfrm` with a per-language ``LC_COLLATE`` setting
+    so that Czech characters (č, ř, š, …) sort next to their base letters.
+    Falls back to plain ``str.lower`` when the locale is unavailable.
+    """
+    global _collate_locale
+    lang = detect_language()
+    loc = _LOCALE_MAP.get(lang)
+    if loc and loc != _collate_locale:
+        try:
+            locale.setlocale(locale.LC_COLLATE, loc)
+            _collate_locale = loc
+        except locale.Error:
+            _collate_locale = None
+    if _collate_locale:
+        return locale.strxfrm(name)
+    return name.lower()
 
 
 # TODO: TAGS, edit song, create song
@@ -101,7 +133,8 @@ def api_init():
         return "window.__INIT__ = null;", 200, {"Content-Type": "text/javascript"}
 
     # Songlist (same serialization as get_songs handler)
-    songs = db.session.query(Song).filter_by(band_id=band.id).order_by(Song.name).all()
+    songs = db.session.query(Song).filter_by(band_id=band.id).all()
+    songs.sort(key=lambda s: _locale_sort_key(s.name))
     tags = db.session.query(Tag).filter_by(band_id=band.id).all()
     songlist = {
         "tags": [t.name for t in tags],
@@ -565,8 +598,9 @@ def on_save_playlist(data):
 def get_songs(data={}):
     band = get_band()
 
-    songs = db.session.query(Song).filter_by(band_id=band.id).order_by(Song.name).all()
-    tags = db.session.query(Tag).filter_by(band_id=band.id).all()#.order_by(Song.name).all()
+    songs = db.session.query(Song).filter_by(band_id=band.id).all()
+    songs.sort(key=lambda s: _locale_sort_key(s.name))
+    tags = db.session.query(Tag).filter_by(band_id=band.id).all()
 
     res = {
         "tags": [

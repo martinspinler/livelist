@@ -24,6 +24,22 @@ packages = [
     "livelist",
     "livelist.client",
     "livelist.config",
+    "livelist.l10n",
+    "livelist.locales",
     "livelist.models",
     "livelist.routes",
+]
+
+[tool.setuptools.package-data]
+# Ship the committed (non-fetched) frontend assets so non-editable installs
+# have them. Third-party libs stay out (gitignored) and are fetched via
+# `flask fetch-static` (optionally into $LIVELIST_STATIC_DIR).
+"livelist" = [
+    "templates/*.html",
+    "static/favicon.ico",
+    "static/css/bs-custom.css",
+    "static/css/custom.css",
+    "static/js/app.js",
+    "static/js/dnd.js",
+    "static/js/fullscreen.js",
 ]

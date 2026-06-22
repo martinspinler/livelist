@@ -55,6 +55,9 @@ pip install -e ".[all]"      # server + client
 pip install -e ".[server]"   # server only
 ```
 
+The web UI vendors its frontend libraries locally (not from a CDN). After
+installing, run `flask fetch-static` once (see below) to download them.
+
 ### Configure
 
 Set environment variables (or use a `.env` file). For the Flask CLI, point it at the app once per shell:
@@ -68,10 +71,14 @@ export FLASK_APP=livelist.server
 | `LIVELIST_DATABASE_URI` | SQLAlchemy database URI | `sqlite:///livelist.db` |
 | `LIVELIST_DOMAINS` | Colon-separated main domains for subdomain routing | *(empty)* |
 | `LIVELIST_SHEET_STORE_PATH` | Base filesystem directory for sheet-music files (an optional `{band}` placeholder is filled with the band's `addr`) | *(empty)* |
+| `LIVELIST_STATIC_DIR` | Directory holding the frontend static assets (CSS/JS/fonts). When set, `flask fetch-static` populates it with both the bundled and downloaded assets and Flask serves from there. Mainly for non-editable installs where `site-packages` is read-only or shouldn't be written to. | package `static/` |
 
 ### Initialize & Run
 
 ```bash
+# Download frontend assets (Bootstrap, icons, Socket.IO client)
+flask fetch-static
+
 # Create database tables
 flask init-db
 
@@ -83,4 +90,14 @@ flask set-sheet-store <addr> examples/sheet-store-perfecttime.json
 
 # Start the server
 python -m livelist.server
+```
+
+By default `flask fetch-static` writes assets into the package's `static/`
+directory, which is correct for editable installs. For non-editable installs
+where `site-packages` is read-only or shouldn't be written to, set
+`LIVELIST_STATIC_DIR` to a writable path — Flask will serve from there:
+
+```bash
+export LIVELIST_STATIC_DIR=/var/lib/livelist/static
+flask fetch-static
 ```

@@ -16,6 +16,7 @@ from .models import Band, Song, Playlist, PlaylistItem, Tag, db
 from .routes import views_bp
 from .routes.views import get_privileges, get_default_playlist, find_documents_by_song
 from .l10n import t as _t, get_translations, detect_language, get_supported_langs
+from .utils.fetch_static import fetch as fetch_static_assets, get_static_dir
 
 # Language code → POSIX locale used for locale-aware sorting
 _LOCALE_MAP = {
@@ -56,7 +57,10 @@ def _locale_sort_key(name: str) -> str:
 load_dotenv()
 
 # Initialize Flask app
-app = Flask(__name__)
+# Static folder: package default, or $LIVELIST_STATIC_DIR when overridden.
+# Pin static_url_path so the /static URL prefix stays constant regardless of
+# where the folder lives (Flask otherwise derives it from the folder basename).
+app = Flask(__name__, static_folder=str(get_static_dir()), static_url_path="/static")
 app.config.from_object(Config)
 
 
@@ -751,6 +755,26 @@ def internal_error(error):
 
 
 # CLI commands
+@app.cli.command("fetch-static")
+@click.option("--force", is_flag=True, help="Re-download even if assets are already present.")
+def fetch_static_command(force):
+    """Download frontend assets (Bootstrap, Bootstrap Icons, Socket.IO client).
+
+    Run this once after install, before first launch, so the web UI's
+    CSS/JS/fonts are available locally. Idempotent: skips the download when
+    everything is already present (use --force to re-download).
+
+    Honors LIVELIST_STATIC_DIR: when set, assets are fetched there and the
+    package's committed static files are copied in, making it the complete
+    static root that Flask serves from.
+    """
+    try:
+        fetch_static_assets(force=force)
+    except RuntimeError as exc:
+        print(exc)
+        raise SystemExit(1)
+
+
 @app.cli.command("init-db")
 def init_db_command():
     """Initialize the database"""

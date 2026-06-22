@@ -633,6 +633,11 @@ def get_songs(data={}):
             }
             for s in songs
         ],
+        # Band-level sheet-store config ({patterns, instruments}) so that
+        # clients which resolve sheet files on their own filesystem (e.g.
+        # gigpanel) can run the shared finder offline after connect. The
+        # filesystem *prefix* is machine-specific and stays client-side.
+        "sheet_store": json.loads(band.sheet_store) if band.sheet_store else {},
     }
 
     emit("songlist", res, to=f"band_{band.id}")

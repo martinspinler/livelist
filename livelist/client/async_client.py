@@ -39,6 +39,10 @@ class AsyncLivelistClient(PlaylistClient):
         self._url = url
         self._auth: dict = {"band": band, "key": key}
         self._defstore = default_store
+        # Band-level sheet-store config ({patterns, instruments}) fetched
+        # alongside the songlist and cached so the shared finder can run
+        # offline (no server round-trip per document lookup).
+        self.band_config: dict = {}
         self.sio = socketio.AsyncSimpleClient()
 
     # ---- Connection lifecycle ------------------------------------------
@@ -242,6 +246,8 @@ class AsyncLivelistClient(PlaylistClient):
 
     def _parse_songlist(self, data: Any) -> None:
         """Parse raw songlist data into Song objects."""
+        # Cache band-level sheet-store config carried in the same payload.
+        self.band_config = data.get("sheet_store") or {}
         song_fields = [s.name for s in fields(Song)]
         songlist: Dict[int, Song] = {
             v["id"]: Song(**{k: val for k, val in v.items() if k in song_fields})

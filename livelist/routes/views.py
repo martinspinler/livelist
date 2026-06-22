@@ -6,7 +6,6 @@ import os
 import json
 import subprocess
 from pathlib import Path
-from dataclasses import asdict, dataclass, field
 from typing import Any, Optional, TypedDict
 
 import flask.json
@@ -17,6 +16,12 @@ from datetime import date
 
 
 from ..models import Band, Playlist, PlaylistItem, Song, db
+from ..songfind import (
+    Store,
+    build_store,
+    find_documents as _find_documents,
+    resolve_document as _resolve_document_path,
+)
 from . import views_bp
 
 
@@ -26,87 +31,6 @@ IMG_CACHE_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'cache
 
 RENDERING_LABELS = {'pdf': 'Sheet', 'text': 'Lyrics', 'ireal': 'iReal'}
 
-@dataclass
-class Pattern:
-    id: str
-    render: str
-    pattern: str
-    label: str
-    instr: list[str] = field(default_factory=list)
-
-
-@dataclass
-class Instrument:
-    id: str
-    name: str
-    patterns: list[str]
-    prio: Optional[list[str]] = None
-
-
-@dataclass
-class Store:
-    patterns: dict[str, Pattern]
-    instruments: dict[str, Instrument]
-    prefix: str
-
-
-def _effective_suffix_idx(
-    suffix_idx: int,
-    instr_suffixes: list,
-    template: str,
-    has_instr_placeholder: bool,
-    pat_instr: Optional[list],
-    instr_id: str,
-    patterns: dict[str, Pattern],
-    prio: list[str],
-    pat: Pattern
-) -> int:
-    """Compute the effective suffix index for auto-select priority.
-
-    The returned integer determines how the client ranks this document for
-    a given instrument (lower = higher priority).
-
-    Three cases:
-
-    1. Pattern HAS ``{instrument}`` placeholder → the suffix was actually
-       used in the filename, so its real position (suffix_idx) is the
-       priority.
-
-    2. Pattern LACKS ``{instrument}`` AND has an explicit ``instr`` list
-       in the pattern config (e.g. ``["voc"]`` on a lyrics PDF):
-       - If instr_id IS in that list → eff_idx = 0 (high priority for
-         this instrument; pattern order among equal indices resolves
-         specific-vs-generic ties since specific patterns are listed
-         earlier in the config).
-       - If instr_id is NOT in that list → eff_idx = len(suffixes)
-         (low priority fallback).
-
-    3. Pattern LACKS ``{instrument}`` AND has NO ``instr`` list →
-       heuristic: scan all suffixes and check if any stripped suffix
-       string appears in the template path (e.g. suffix ' - Lyrics'
-       matches ``0_Lyrics/{name}.pdf``).  If found, use that suffix's
-       index; otherwise fall back to len(suffixes).
-    """
-    for i, p in enumerate(prio):
-        if p == pat.id:
-            return i
-
-    if has_instr_placeholder:
-        return suffix_idx
-
-    # Generic pattern — check explicit instr list first
-    if pat_instr is not None:
-        if instr_id in pat_instr:
-            return 0
-        return len(instr_suffixes)
-
-    # No explicit instr: heuristic — match suffix keywords against path
-    for si, sfx in enumerate(instr_suffixes):
-        stripped = sfx.lstrip(' -')
-        if stripped and stripped in template:
-            return si
-
-    return len(instr_suffixes)
 
 def _get_store(band: Band) -> Store:
     """Build a Store from the band's per-band sheet_store config.
@@ -116,81 +40,30 @@ def _get_store(band: Band) -> Store:
     empty store is returned so the app degrades gracefully instead of
     crashing — bands simply show no documents until configured.
     """
-    band_addr = band.addr
     _prefix = current_app.config.get("SHEET_STORE_PATH")
     store = json.loads(band.sheet_store) if band.sheet_store else {}
+    prefix: str = "" if _prefix is None else str(_prefix).format(band=band.addr)
+    return build_store(store, prefix)
 
-    patterns = {k: Pattern(id=k, **v) for k, v in store.get('patterns', {}).items()}
-    instruments = {k: Instrument(id=k, **v) for k, v in store.get('instruments', {}).items()}
-    prefix: str = "" if _prefix is None else str(_prefix).format(band=band_addr)
-    return Store(patterns, instruments, prefix)
+
+def _name_candidates(song: Song) -> list[str]:
+    """Name candidates for a song: prefer song.filename (covers case-sensitive
+    variants like "All Of Me" vs "All of Me"), fall back to song.name."""
+    name_candidates = [song.filename] if song.filename else []
+    if song.name not in name_candidates:
+        name_candidates.append(song.name)
+    return name_candidates
 
 
 def find_documents_by_song(song: Song) -> list:
     """Find all unique documents for a song by iterating patterns × instruments.
 
-    Returns a list of document dicts, each with:
-      pattern_id          – id of the pattern that produced this file
-      render              – render type ("pdf", "text")
-      path                – file path relative to the store prefix
-      instruments_matched – {instr_id: suffix_index} mapping; the suffix_index
-                            determines auto-select priority on the client
-                            (lower = higher priority).  See _effective_suffix_idx.
-      label               – human-readable label from the pattern config
-
-    Documents are deduplicated by absolute file path.  When two pattern×instrument
-    combinations resolve to the same file, their matched instruments are merged
-    and the first pattern's id/label is kept.
+    Thin wrapper around the shared :mod:`livelist.songfind` module; the
+    server always probes without orientation (``None``) — orientation-aware
+    probing is a client concern.
     """
-
     st = _get_store(song.band)
-
-    seen = {}  # abs_path → document dict
-
-    # Name candidates: prefer song.filename (covers case-sensitive variants
-    # like "All Of Me" vs "All of Me"), fall back to song.name.
-    name_candidates = [song.filename] if song.filename else []
-    if song.name not in name_candidates:
-        name_candidates.append(song.name)
-
-    for idx, pat in enumerate(st.patterns.values()):
-        template = pat.pattern
-        label = pat.label
-        has_instr_placeholder = '{instrument}' in template
-
-        for instr in st.instruments.values():
-            for suffix_idx, suffix in enumerate(instr.patterns):
-                matched_rel = None
-                matched_abs = None
-                for name in name_candidates:
-                    candidate_rel = template.format(name=name, instrument=suffix)
-                    candidate_abs = st.prefix + candidate_rel
-                    #print(candidate_abs)
-                    if os.path.isfile(candidate_abs):
-                        matched_rel = candidate_rel
-                        matched_abs = candidate_abs
-                        break
-                if matched_abs is None:
-                    continue
-                eff_idx = _effective_suffix_idx(
-                    suffix_idx, instr.patterns, template,
-                    has_instr_placeholder, pat.instr, instr.id, st.patterns, instr.prio, pat
-                )
-                if matched_abs not in seen:
-                    seen[matched_abs] = {
-                        'pattern_id': pat.id,
-                        'render': pat.render,
-                        'path': matched_rel,
-                        'instruments_matched': {instr.id: eff_idx},
-                        'label': label or pat.id,
-                    }
-                else:
-                    doc = seen[matched_abs]
-                    if instr.id not in doc['instruments_matched']:
-                        doc['instruments_matched'][instr.id] = eff_idx
-                break  # first matching suffix per instrument is enough
-
-    return list(seen.values())
+    return _find_documents(_name_candidates(song), st, orientation=None)
 
 
 def resolve_document(song: Song, pattern_id: str, instr_id: str) -> Optional[str]:
@@ -201,25 +74,7 @@ def resolve_document(song: Song, pattern_id: str, instr_id: str) -> Optional[str
     absolute file path, or None.
     """
     st = _get_store(song.band)
-
-    pat = st.patterns.get(pattern_id)
-    instr = st.instruments.get(instr_id)
-
-    if pat is None or instr is None:
-        return None
-
-    template = pat.pattern
-    name_candidates = [song.filename] if song.filename else []
-    if song.name not in name_candidates:
-        name_candidates.append(song.name)
-    for suffix in instr.patterns:
-        for name in name_candidates:
-            candidate_rel = template.format(name=name, instrument=suffix)
-            candidate_abs = st.prefix + candidate_rel
-            if os.path.isfile(candidate_abs):
-                return candidate_abs
-
-    return None
+    return _resolve_document_path(_name_candidates(song), st, pattern_id, instr_id)
 
 
 def get_privileges(band_name, key):

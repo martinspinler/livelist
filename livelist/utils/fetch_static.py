@@ -25,6 +25,7 @@ Assets fetched
   - Bootstrap 5 CSS + JS bundle (+ source map)
   - Bootstrap Icons 1.13.1 CSS + web fonts
   - Socket.IO 3.1.3 client (+ source map)
+  - iReal Renderer (chord-chart engine + iRealFont web fonts)
 """
 
 from __future__ import annotations
@@ -70,6 +71,10 @@ _ZIP_ASSETS = [
         "https://github.com/twbs/icons/releases/download/v1.13.1/bootstrap-icons-1.13.1.zip",
         "_extract_bootstrap_icons",
     ),
+    (
+        "https://github.com/daumling/ireal-renderer/archive/refs/heads/master.zip",
+        "_extract_ireal_renderer",
+    ),
 ]
 
 # Files/dirs produced by fetching (excluded when copying committed files, so a
@@ -78,10 +83,14 @@ _ZIP_ASSETS = [
 _FETCHED_FILES = {
     "css/bootstrap.min.css",
     "css/bootstrap-icons.min.css",
+    "css/ireal-renderer.css",
+    "css/ireal-style.css",
     "js/bootstrap.bundle.min.js",
     "js/bootstrap.bundle.min.js.map",
     "js/socket.io.min.js",
     "js/socket.io.min.js.map",
+    "js/ireal-reader-tiny.js",
+    "js/ireal-renderer.js",
 }
 _FETCHED_DIRS = {"css/fonts"}
 
@@ -131,8 +140,67 @@ def _extract_bootstrap_icons(zip_path: Path, static_dir: Path) -> None:
                         shutil.copyfileobj(src, dst)
 
 
+def _extract_ireal_renderer(zip_path: Path, static_dir: Path) -> None:
+    """Pull JS, CSS, and font files out of the ireal-renderer archive.
+
+    The upstream CSS uses ``@import 'style.css'`` and a Google Fonts URL.
+    We rename ``style.css`` → ``ireal-style.css`` to avoid name clashes and
+    patch the import in ``ireal-renderer.css`` accordingly.  The Google Fonts
+    import is dropped (the CSS falls back to ``sans-serif``).
+    """
+    js_dir = static_dir / "js"
+    css_dir = static_dir / "css"
+    fonts_dir = css_dir / "fonts"
+    js_dir.mkdir(parents=True, exist_ok=True)
+    css_dir.mkdir(parents=True, exist_ok=True)
+    fonts_dir.mkdir(parents=True, exist_ok=True)
+
+    # Mapping: (path-inside-zip-prefix, destination-filename, dest-dir)
+    file_map = {
+        "src/ireal-reader-tiny.js": (js_dir, "ireal-reader-tiny.js"),
+        "src/ireal-renderer.js":     (js_dir, "ireal-renderer.js"),
+        "css/ireal-renderer.css":    (css_dir, "ireal-renderer.css"),
+        "css/style.css":             (css_dir, "ireal-style.css"),
+    }
+
+    with zipfile.ZipFile(zip_path) as zf:
+        for name in zf.namelist():
+            if name.endswith("/"):
+                continue
+            # Strip the top-level dir (e.g. "ireal-renderer-master/")
+            parts = name.split("/", 1)
+            if len(parts) < 2:
+                continue
+            rel = parts[1]
+
+            # Font files
+            if rel.startswith("css/fonts/") and not rel.endswith("/"):
+                fname = rel.rsplit("/", 1)[-1]
+                with zf.open(name) as src, open(fonts_dir / fname, "wb") as dst:
+                    shutil.copyfileobj(src, dst)
+                continue
+
+            # Mapped files
+            if rel in file_map:
+                dest_dir, dest_name = file_map[rel]
+                data = zf.read(name)
+                # Patch the CSS import path
+                if rel == "css/ireal-renderer.css":
+                    text = data.decode("utf-8")
+                    text = text.replace("@import 'style.css';",
+                                        "@import 'ireal-style.css';")
+                    text = text.replace(
+                        "@import url('https://fonts.googleapis.com/css2?"
+                        "family=Open+Sans+Condensed:wght@700&display=swap');",
+                        "/* Open Sans Condensed is optional — falls back to sans-serif */")
+                    data = text.encode("utf-8")
+                with open(dest_dir / dest_name, "wb") as dst:
+                    dst.write(data)
+
+
 _HANDLERS = {
     "_extract_bootstrap_icons": _extract_bootstrap_icons,
+    "_extract_ireal_renderer": _extract_ireal_renderer,
 }
 
 
@@ -176,7 +244,10 @@ def is_present(static_dir: Path | None = None) -> bool:
     for _, rel in _SINGLE_FILES:
         if not (static_dir / rel).exists():
             return False
-    return (static_dir / "css" / "bootstrap-icons.min.css").exists()
+    return (
+        (static_dir / "css" / "bootstrap-icons.min.css").exists()
+        and (static_dir / "js" / "ireal-renderer.js").exists()
+    )
 
 
 def fetch(force: bool = False) -> None:

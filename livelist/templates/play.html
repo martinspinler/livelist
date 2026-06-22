@@ -90,6 +90,30 @@
         font-size: 1.5rem;
     }
     .ireal-stub .bi { font-size: 3rem; display: block; margin-bottom: 1rem; }
+    /* --- iReal engine --- */
+    .ireal-container {
+        width: 100%;
+        height: calc(100vh - var(--play-nav-h));
+        overflow-y: auto;
+        padding: 1rem 2rem;
+        box-sizing: border-box;
+    }
+    .ireal-header {
+        margin-bottom: 1rem;
+        font-family: monospace;
+        font-size: 1.1rem;
+        color: #222;
+    }
+    body.night .ireal-header { color: #eee; }
+    .ireal-title { font-weight: bold; }
+    .ireal-key { color: #666; }
+    body.night .ireal-key { color: #aaa; }
+    .ireal-composer { font-size: 0.9rem; color: #555; margin-left: 0.5em; }
+    body.night .ireal-composer { color: #999; }
+    .ireal-style { font-size: 0.8rem; color: #888; font-style: italic; margin-left: 0.5em; }
+    .ireal-chords {
+        font-size: 18pt;
+    }
     /* --- Shared --- */
     .no-content-msg {
         font-size: 2rem;
@@ -101,6 +125,10 @@
 </style>
 <script type="text/javascript" src="{{ url_for('static', filename='js/socket.io.min.js') }}"></script>
 <script type="text/javascript" src="{{ url_for('static', filename='js/fullscreen.js') }}"></script>
+<!-- iReal renderer (third-party chord-chart engine) -->
+<link rel="stylesheet" href="{{ url_for('static', filename='css/ireal-renderer.css') }}">
+<script type="text/javascript" src="{{ url_for('static', filename='js/ireal-reader-tiny.js') }}"></script>
+<script type="text/javascript" src="{{ url_for('static', filename='js/ireal-renderer.js') }}"></script>
 {% endblock %}
 
 {% block content %}
@@ -512,15 +540,129 @@ function jinja_update(state) {
             });
     }
 
-    // -- iReal engine (stub) --
+    // -- iReal engine --
 
-    function renderIreal() {
+    var irealPlaylist = null;       // cached Playlist object
+    var irealPlaylistUrl = null;    // URL the cache is for
+
+    function renderIreal(songId, patternId, instrId) {
         clearContent();
-        contentInner.innerHTML =
-            '<div class="ireal-stub">' +
-            '<i class="bi bi-music-note-beamed"></i>' +
-            'iReal rendering not yet implemented' +
-            '</div>';
+        var url = '/ireal/' + songId + '/' + patternId + '/' + instrId;
+        var songName = '';
+        var item = getActiveItem();
+        if (item) songName = item.song_name;
+
+        // Show a loading indicator
+        contentInner.innerHTML = '<div class="ireal-stub"><i class="bi bi-music-note-beamed"></i>Loading…</div>';
+
+        // If we already have this playlist cached, render immediately
+        if (irealPlaylistUrl === url && irealPlaylist) {
+            renderIrealSong(irealPlaylist, songName);
+            return;
+        }
+
+        fetch(url)
+            .then(function(resp) {
+                if (!resp.ok) return null;
+                // Song name from header for fallback matching
+                var hdrName = resp.headers.get('X-Song-Name');
+                if (hdrName) songName = hdrName;
+                return resp.text();
+            })
+            .then(function(text) {
+                if (!text || text.indexOf('irealb://') === -1) {
+                    showNoContent('Not an iReal file');
+                    return;
+                }
+                try {
+                    irealPlaylist = new Playlist(text);
+                    irealPlaylistUrl = url;
+                    renderIrealSong(irealPlaylist, songName);
+                } catch (err) {
+                    console.error('iReal parse error:', err);
+                    showNoContent('iReal parse error');
+                }
+            })
+            .catch(function(err) {
+                showNoContent('No iReal chart');
+            });
+    }
+
+    /** Find a song by name inside the playlist and render it. */
+    function renderIrealSong(playlist, songName) {
+        if (!playlist || !playlist.songs || playlist.songs.length === 0) {
+            showNoContent('Empty iReal playlist');
+            return;
+        }
+
+        // Try exact match first, then case-insensitive, then "starts with"
+        var song = null;
+        var lower = songName.toLowerCase().trim();
+
+        for (var i = 0; i < playlist.songs.length; i++) {
+            if (playlist.songs[i].title === songName) {
+                song = playlist.songs[i];
+                break;
+            }
+        }
+        if (!song) {
+            for (var i = 0; i < playlist.songs.length; i++) {
+                if (playlist.songs[i].title.toLowerCase() === lower) {
+                    song = playlist.songs[i];
+                    break;
+                }
+            }
+        }
+        if (!song) {
+            for (var i = 0; i < playlist.songs.length; i++) {
+                if (playlist.songs[i].title.toLowerCase().indexOf(lower) === 0 ||
+                    lower.indexOf(playlist.songs[i].title.toLowerCase()) === 0) {
+                    song = playlist.songs[i];
+                    break;
+                }
+            }
+        }
+
+        if (!song) {
+            showNoContent('Song not in iReal playlist');
+            return;
+        }
+
+        var options = {
+            minor: 'minus',
+            transpose: 0,
+            useH: false,
+            hilite: true
+        };
+
+        try {
+            var r = new iRealRenderer();
+            r.parse(song);
+            song = r.transpose(song, options);
+
+            // Build container with title/header + scrollable chord area
+            var keyDisp = song.key.replace(/b/g, '\u266d').replace(/#/g, '\u266f');
+            var html = '<div class="ireal-container">' +
+                '<div class="ireal-header">' +
+                '<span class="ireal-title">' + escapeHtml(song.title) + '</span>' +
+                ' <span class="ireal-key">(' + escapeHtml(keyDisp) + ')</span>' +
+                (song.composer ? ' <span class="ireal-composer">' + escapeHtml(song.composer) + '</span>' : '') +
+                (song.style ? ' <span class="ireal-style">' + escapeHtml(song.style) + '</span>' : '') +
+                '</div><div class="ireal-chords" id="ireal-chords"></div></div>';
+
+            contentInner.innerHTML = html;
+            var container = document.getElementById('ireal-chords');
+            r.render(song, container, options);
+        } catch (err) {
+            console.error('iReal render error:', err);
+            showNoContent('iReal render error');
+        }
+    }
+
+    function escapeHtml(str) {
+        var div = document.createElement('div');
+        div.textContent = str;
+        return div.innerHTML;
     }
 
     // -- Dispatch ----
@@ -540,7 +682,7 @@ function jinja_update(state) {
         switch (doc.render) {
             case 'pdf':   renderPdf(songId, doc.pattern_id, resolveInstr);   break;
             case 'text':  renderText(songId, doc.pattern_id, resolveInstr);  break;
-            case 'ireal': renderIreal();                                       break;
+            case 'ireal': renderIreal(songId, doc.pattern_id, resolveInstr);  break;
             default:      renderPdf(songId, doc.pattern_id, resolveInstr);
         }
     }

@@ -4,3 +4,5 @@ livelist/static/js/*bootstrap*
 livelist/static/js/*socket*
 livelist/static/css/*bootstrap*
 livelist/static/css/fonts/*
+livelist/static/js/ireal-*.js
+livelist/static/css/ireal-*.css

@@ -469,6 +469,41 @@ def lyrics_view(song_id: int, pattern_id: str, instr_id: str):
     return render_template("lyrics.html", paragraphs=paragraphs)
 
 
+@views_bp.route("/ireal/<int:song_id>/<pattern_id>/<instr_id>")
+def ireal_view(song_id: int, pattern_id: str, instr_id: str):
+    """Serve an iReal Pro playlist file for a song.
+
+    URL pattern: ``/ireal/<song_id>/<pattern_id>/<instr_id>``
+
+    Locates the source ``.link`` (or ``.html``) file via ``resolve_document``
+    and returns its raw text content.  The file is expected to contain an
+    ``irealb://`` URL — a full playlist that may hold many songs.  The
+    frontend parses it client-side with the ireal-renderer library, finds
+    the song matching the current song name, and renders the chord chart.
+    """
+    song = db.session.get(Song, song_id)
+    if song is None:
+        abort(404)
+
+    filename = resolve_document(song, pattern_id, instr_id)
+    if not filename:
+        abort(404)
+
+    try:
+        with open(filename, 'r', encoding='utf-8') as f:
+            content = f.read()
+    except OSError:
+        abort(500)
+
+    # Return as plain text; the client handles parsing.
+    # Include the song name in a header so the client can find the
+    # matching entry inside the playlist without an extra round-trip.
+    resp = make_response(content)
+    resp.headers['Content-Type'] = 'text/plain; charset=utf-8'
+    resp.headers['X-Song-Name'] = song.name
+    return resp
+
+
 # Helper function to get current band (duplicated from app.py for views)
 def _get_current_band(band_name=None):
     """Get current band based on subdomain or URL parameter"""

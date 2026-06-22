@@ -154,9 +154,9 @@
         <div class="d-flex align-items-center w-100 gap-1">
             <button class="btn btn-outline-primary bi bi-arrows-fullscreen" id="btn-fullscreen"
                     title="Fullscreen"></button>
-            <div id="playlistHeader" class="d-flex align-items-center me-auto min-w-0 gap-1 flex-wrap">
+            <div id="playlistHeader" class="d-flex align-items-center me-auto min-w-0 gap-0 flex-wrap">
                 <span class="navbar-brand text-muted text-truncate" id="livelist-name"
-                      style="max-width:50vw; min-width:0"></span>
+                      style="max-width:50vw; min-width:0; padding-top:0; padding-bottom:0"></span>
                 <small class="text-muted" id="livelist-date"></small>
                 <small class="text-muted" id="livelist-stats"></small>
             </div>
@@ -190,17 +190,27 @@
             </div>
         </div>
 
-        <!-- Row 2: add song + anchor info + mode toggle -->
+        <!-- Row 2: context actions (swap by mode) + mode toggle.
+             Play/Move mode shows add-song + anchor info;
+             Edit mode shows delete-selected + update-order. -->
         <div class="d-flex w-100 mt-1 align-items-center">
-            <button class="btn btn-outline-primary bi bi-plus mx-1" data-bs-toggle="offcanvas"
-                data-bs-target="#songlist-panel" id="btn-songlist-panel" title="{{ _('nav_add_song') }}">
-                <span class="d-none d-sm-inline">{{ _('nav_add_song') }}</span></button>
-            <span class="navbar-text text-muted me-2" id="anchor-info" role="button"
-                  title="{{ _('nav_scroll_anchor') }}" style="cursor: pointer">
-                <span class="btn btn-primary btn-sm px-1 py-0" id="anchor-info-pos"></span>
-                <span id="anchor-info-name"></span> <span class="anchor-info-symbol">⚓</span><i id="anchor-info-dir"
-                    class="bi bi-arrow-down"></i>
-            </span>
+            <div class="d-flex align-items-center flex-grow-1 min-w-0" id="nav-play-actions">
+                <button class="btn btn-outline-primary bi bi-plus me-1" data-bs-toggle="offcanvas"
+                    data-bs-target="#songlist-panel" id="btn-songlist-panel" title="{{ _('nav_add_song') }}">
+                    <span class="d-none d-sm-inline">{{ _('nav_add_song') }}</span></button>
+                <span class="navbar-text text-muted me-2" id="anchor-info" role="button"
+                      title="{{ _('nav_scroll_anchor') }}" style="cursor: pointer">
+                    <span class="btn btn-primary btn-sm px-1 py-0" id="anchor-info-pos"></span>
+                    <span id="anchor-info-name"></span> <span class="anchor-info-symbol">⚓</span><i id="anchor-info-dir"
+                        class="bi bi-arrow-down"></i>
+                </span>
+            </div>
+            <div class="d-none d-flex align-items-center flex-grow-1 min-w-0" id="nav-edit-actions">
+                <button class="btn btn-danger bi bi-trash xd-none me-1" id="livelist-delete-selected"
+                    title="{{ _('action_delete_selected') }}"><span class="d-none d-sm-inline">{{ _('action_delete_selected') }}</span></button>
+                <button class="btn btn-warning bi bi-sort-numeric-down" id="edit-sort"
+                    title="{{ _('action_update_order') }}"><span class="d-none d-sm-inline">{{ _('action_update_order') }}</span></button>
+            </div>
 
             <div class="btn-group ms-auto" id="mode-toggle">
                 <button class="btn btn-primary" id="mode-play" title="{{ _('mode_play') }}"><i
@@ -213,12 +223,6 @@
                         class="bi bi-pencil-fill"></i>
                     <span class="d-none d-md-inline">{{ _('mode_edit') }}</span></button>
             </div>
-        </div>
-        <div class="d-flex w-100 mt-1 align-items-center d-none" id="nav-edit">
-            <button class="btn btn-danger bi bi-trash xd-none me-1" id="livelist-delete-selected"
-                title="{{ _('action_delete_selected') }}">{{ _('action_delete_selected') }}</button>
-            <button class="btn btn-warning bi bi-sort-numeric-down" id="edit-sort"
-                title="{{ _('action_update_order') }}">{{ _('action_update_order') }}</button>
         </div>
         <!-- Selection events: sort, cut (and move to another position / playlist) -->
     </div>

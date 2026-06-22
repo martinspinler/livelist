@@ -1297,8 +1297,10 @@ function initApplication() {
         livelistEl?.classList.toggle('mode-move', mode === 'move');
         livelistEl?.classList.toggle('mode-edit', mode === 'edit');
 
-        // Nav sections: edit nav visible only in Edit mode
-        document.getElementById('nav-edit').classList.toggle('d-none', mode !== 'edit');
+        // Nav row 2 swaps by mode: play/move shows add-song + anchor;
+        // edit shows delete-selected + update-order.
+        document.getElementById('nav-play-actions')?.classList.toggle('d-none', mode === 'edit');
+        document.getElementById('nav-edit-actions')?.classList.toggle('d-none', mode !== 'edit');
     }
 
     function handle_move_to_anchor(itemId) {

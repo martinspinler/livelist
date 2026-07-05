@@ -303,7 +303,7 @@ function initApplication() {
             }
         }
 
-        if (state.lastAction == "add_song") {
+        if (state.lastAction && state.lastAction.type === "add_song") {
             if (!state.anchorItemSticky) {
                 if (ai == null) {
                     ai = document.querySelectorAll('.livelist-item')[0];
@@ -316,8 +316,27 @@ function initApplication() {
                     ai = next;
                 }
             }
-            state.lastAction = null;
+        } else if (state.lastAction && state.lastAction.type === "add_break") {
+            if (!state.anchorItemSticky) {
+                const { target_id, before } = state.lastAction;
+                if (target_id != null) {
+                    const targetEl = list_e.querySelector(`[data-item-id="${target_id}"]`);
+                    if (targetEl) {
+                        // The new break was inserted immediately before or after targetEl;
+                        // find it by walking to the adjacent sibling.
+                        if (before) {
+                            ai = targetEl.previousElementSibling;
+                        } else {
+                            ai = targetEl.nextElementSibling;
+                        }
+                    }
+                } else {
+                    // No items existed — the new break is the only real item in the list
+                    ai = list_e.querySelector('.livelist-break[data-item-id]');
+                }
+            }
         }
+        state.lastAction = null;
         livelist_item_set_anchor(ai);
 
         livelist_update_item_numbers();
@@ -480,6 +499,18 @@ function initApplication() {
             }
         }
         requestAnimationFrame(() => ai.scrollIntoView({block: 'center', behavior: 'smooth'}));
+    }
+
+    function resolve_anchor_target() {
+        const ai = state.anchorItem;
+        if (ai && ai.dataset.itemId) {
+            return { target_id: parseInt(ai.dataset.itemId), before: state.anchorItemSticky };
+        }
+        const firstItem = document.querySelector('#livelist-items .livelist-item, #livelist-items .livelist-break[data-item-id]');
+        if (firstItem && firstItem.dataset.itemId) {
+            return { target_id: parseInt(firstItem.dataset.itemId), before: true };
+        }
+        return null;
     }
 
     function toggleSetCollapse(setKey) {
@@ -1200,17 +1231,9 @@ function initApplication() {
 
     function update_move_to_anchor_visibility() {
         const mode = state.editMode ? 'edit' : (state.moveMode ? 'move' : 'play');
-        // Regular items
-        document.querySelectorAll('.livelist-item-move-to-anchor').forEach(btn => {
-            const item = btn.closest('.livelist-item');
-            const isAnchor = item === state.anchorItem;
-            btn.classList.toggle('d-none', mode !== 'move' || isAnchor);
-        });
-        // Break items
-        document.querySelectorAll('.livelist-break-move-to-anchor').forEach(btn => {
-            const breakEl = btn.closest('.livelist-break');
-            const isAnchor = breakEl === state.anchorItem;
-            btn.classList.toggle('d-none', mode !== 'move' || isAnchor);
+        document.querySelectorAll('.livelist-item-move-to-anchor, .livelist-break-move-to-anchor').forEach(btn => {
+            const el = btn.closest('.livelist-item, .livelist-break');
+            btn.classList.toggle('d-none', mode !== 'move' || el === state.anchorItem);
         });
     }
 
@@ -1304,54 +1327,18 @@ function initApplication() {
     }
 
     function handle_move_to_anchor(itemId) {
-        const ai = state.anchorItem;
-        if (!ai) {
-            // Move to top (before first item)
-            const firstItem = document.querySelectorAll('.livelist-item')[0];
-            if (firstItem) {
-                const msg = {
-                    moved_ids: [itemId],
-                    target_id: parseInt(firstItem.dataset.itemId),
-                    before: true,
-                    playlist_id: state.currentPlaylist,
-                };
-                handle_drag_and_drop(msg);
-            }
-            return;
-        }
-
-        let targetId;
-        let isBreakAnchor = false;
-        if (ai.dataset.setKey) {
-            // Virtual Set 1 anchor — move before first song
-            const firstItem = document.querySelectorAll('.livelist-item')[0];
-            if (firstItem) {
-                targetId = parseInt(firstItem.dataset.itemId);
-            }
-        } else if (ai.dataset.itemId && ai.classList.contains('livelist-break')) {
-            // Real break anchor — always insert after the break (= start of set)
-            targetId = parseInt(ai.dataset.itemId);
-            isBreakAnchor = true;
-        } else if (ai.dataset.itemId) {
-            targetId = parseInt(ai.dataset.itemId);
-        }
-
-        if (targetId == null) return;
-
-        // For break anchors, always insert after the break regardless of sticky state;
-        // for regular items, sticky inserts before, non-sticky inserts after.
-        const before = isBreakAnchor ? false : state.anchorItemSticky;
+        const target = resolve_anchor_target();
+        if (!target) return;
 
         const msg = {
             moved_ids: [itemId],
-            target_id: targetId,
-            before: before,
+            target_id: target.target_id,
+            before: target.before,
             playlist_id: state.currentPlaylist,
         };
 
-        // Anchor advancement for non-sticky mode (same as add_song)
-        if (!state.anchorItemSticky) {
-            state.lastAction = "add_song";
+        if (state.anchorItem && !state.anchorItemSticky) {
+            state.lastAction = { type: "add_song" };
         }
 
         handle_drag_and_drop(msg);
@@ -1442,32 +1429,13 @@ function initApplication() {
             before: false,
         };
 
-        let ai = state.anchorItem;
-        if (ai == null) {
-            let elms = document.querySelectorAll('.livelist-item');
-            ai = elms.length > 0 ? elms[0] : null;
-            data.before = true;
+        const target = resolve_anchor_target();
+        if (target) {
+            data.target_id = target.target_id;
+            data.before = target.before;
         }
 
-        if (ai != null && ai.dataset.itemId) {
-            data.target_id = parseInt(ai.dataset.itemId);
-            // Break anchors always insert after the break (= start of that set)
-            // regardless of sticky state; regular items follow sticky semantics
-            if (ai.classList.contains('livelist-break')) {
-                data.before = false;
-            } else {
-                data.before = state.anchorItemSticky;
-            }
-        } else if (ai && ai.dataset.setKey) {
-            // Anchor on virtual Set 1 with no real itemId — insert before first song
-            let elms = document.querySelectorAll('.livelist-item');
-            let first = elms.length > 0 ? elms[0] : null;
-            if (first) {
-                data.target_id = parseInt(first.dataset.itemId);
-                data.before = true;
-            }
-        }
-        state.lastAction = "add_song";
+        state.lastAction = { type: "add_song" };
         state.socket.emit("add_song", data);
 
         document.getElementById('song-filter').value = '';
@@ -1484,28 +1452,17 @@ function initApplication() {
             before: false,
         };
 
-        let ai = state.anchorItem;
-        if (ai == null) {
-            // No anchor — insert before the first real item
-            const firstItem = document.querySelector('#livelist-items .livelist-item, #livelist-items .livelist-break[data-item-id]');
-            if (firstItem && firstItem.dataset.itemId) {
-                data.target_id = parseInt(firstItem.dataset.itemId);
-                data.before = true;
-            }
-        } else if (ai.dataset.itemId) {
-            data.target_id = parseInt(ai.dataset.itemId);
-            if (ai.classList.contains('livelist-break')) {
-                data.before = state.anchorItemSticky;
-            }
-        } else if (ai.dataset.setKey) {
-            // Anchor on virtual Set 1 — insert before first song or break
-            const firstItem = document.querySelector('#livelist-items .livelist-item, #livelist-items .livelist-break[data-item-id]');
-            if (firstItem && firstItem.dataset.itemId) {
-                data.target_id = parseInt(firstItem.dataset.itemId);
-                data.before = true;
-            }
+        const target = resolve_anchor_target();
+        if (target) {
+            data.target_id = target.target_id;
+            data.before = target.before;
         }
 
+        state.lastAction = {
+            type: "add_break",
+            target_id: data.target_id,
+            before: data.before,
+        };
         state.socket.emit("add_break", data);
     }
 

@@ -18,6 +18,13 @@ song_tags = Table(
     Column('tag_id', Integer, ForeignKey('tags.id'))
 )
 
+playlist_event_tags = Table(
+    'playlist_event_tags',
+    Base.metadata,
+    Column('playlist_id', Integer, ForeignKey('playlists.id')),
+    Column('event_tag_id', Integer, ForeignKey('event_tags.id'))
+)
+
 
 class Band(Base):
     __tablename__ = "bands"
@@ -50,6 +57,7 @@ class Band(Base):
 
     songs: Mapped[List["Song"]] = relationship("Song", back_populates="band")
     tags: Mapped[List["Tag"]] = relationship("Tag", back_populates="band")
+    event_tags: Mapped[List["EventTag"]] = relationship("EventTag", back_populates="band")
 
 
 class Playlist(Base):
@@ -83,6 +91,8 @@ class Playlist(Base):
         cascade="all, delete-orphan",
         foreign_keys="[PlaylistItem.playlist_id]"
     )
+
+    tags: Mapped[List["EventTag"]] = relationship("EventTag", secondary=playlist_event_tags, back_populates="playlists")
 
 
 class Song(Base):
@@ -124,6 +134,17 @@ class Tag(Base):
     band: Mapped["Band"] = relationship("Band", back_populates="tags")
     color: Mapped[Optional[str]] = mapped_column(String(7))  # Hex color for UI display
     songs: Mapped[List["Song"]] = relationship("Song", secondary=song_tags, back_populates="tags")
+
+
+class EventTag(Base):
+    __tablename__ = "event_tags"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(50), unique=True)
+    band_id: Mapped[int] = mapped_column(ForeignKey("bands.id"))
+    band: Mapped["Band"] = relationship("Band", back_populates="event_tags")
+    color: Mapped[Optional[str]] = mapped_column(String(7))  # Hex color for UI display
+    playlists: Mapped[List["Playlist"]] = relationship("Playlist", secondary=playlist_event_tags, back_populates="tags")
 
 
 class PlaylistItem(Base):

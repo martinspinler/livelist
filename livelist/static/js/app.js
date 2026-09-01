@@ -21,6 +21,8 @@ function initApplication() {
         lastAction: null,
 
         edit_song_id: null,
+        edit_playlist_tags: [],
+        eventTags: [],
         songitemEditMode: false,
 
         playlist: null,
@@ -53,11 +55,13 @@ function initApplication() {
     if (window.__INIT__) {
         songlist_update(window.__INIT__.songlist);
         playlists_update(window.__INIT__.playlists);
+        state.eventTags = window.__INIT__.event_tags || [];
         if (window.__INIT__.playlist) playlist_select(window.__INIT__.playlist);
     }
 
     window.addEventListener("DOMContentLoaded", function () {
         socket.emit("get_songlist", {});
+        socket.emit("get_event_tags", {});
         /* HOTFIX(synchronization): should emit "get_playlists" and "select_playlist",
          * but it has issues. Maybe try async requests */
     });
@@ -843,6 +847,10 @@ function initApplication() {
                 pi.querySelector('.playlist-item-songcount').textContent =
                     sets + ' set' + (sets !== 1 ? 's' : '') + ', ' + sc + ' song' + (sc !== 1 ? 's' : '');
 
+                pi.dataset.tags = JSON.stringify(item.tags || []);
+                pi.querySelector('.playlist-item-tags').textContent =
+                    (item.tags && item.tags.length) ? ' · ' + item.tags.join(', ') : '';
+
                 pi.classList.toggle("active", item.id == state.currentPlaylist);
 
                 playlist_update_active_item(pi);
@@ -875,6 +883,7 @@ function initApplication() {
         socket.on("playlist_select",    msg => playlist_select(msg));
         socket.on("playlist_created",   msg => playlist_select(msg));
         socket.on("songlist",           msg => songlist_update(msg));
+        socket.on("event_tags",         msg => { state.eventTags = msg; });
         socket.on("playlist_updated",   msg => {
             if (state.currentPlaylist == msg.playlist_id) {
                 livelist_update(msg);
@@ -933,6 +942,7 @@ function initApplication() {
 
         document.getElementById('livelist-delete-selected').addEventListener('click', handle_livelist_delete_selected);
         document.getElementById('edit-song-tag-create').addEventListener('click', handle_editsong_tag_create);
+        document.getElementById('edit-playlist-tag-create').addEventListener('click', handle_editplaylist_tag_create);
 
         document.getElementById('tag-filter-and').addEventListener('click', () => {
             state.tagFilterCombine = 'AND';
@@ -1120,6 +1130,7 @@ function initApplication() {
             const tag_filter_chip = target.closest(".tag-filter-chip");
             const tag_filter_available = target.closest(".tag-filter-available");
             const songlist_item_tag = target.closest(".songlist-item-tag");
+            const edit_playlist_tag = target.closest(".playlist-item-tag");
 
             if (livelist_item) {
                 handle_livelist_item_click(target, livelist_item, parseInt(livelist_item.dataset.itemId));
@@ -1167,6 +1178,16 @@ function initApplication() {
                     song.tags.push(parseTag(rawName).name);
                 }
                 song_save_silent();
+            } else if (edit_playlist_tag) {
+                edit_playlist_tag.classList.toggle("btn-outline-primary");
+                edit_playlist_tag.classList.toggle("btn-primary");
+                const rawName = edit_playlist_tag.dataset.name;
+                const idx = state.edit_playlist_tags.indexOf(rawName);
+                if (idx >= 0) {
+                    state.edit_playlist_tags.splice(idx, 1);
+                } else {
+                    state.edit_playlist_tags.push(rawName);
+                }
             } else if (tag_filter_available) {
                 addFilterChip(tag_filter_available.dataset.tag, 'include');
             } else if (tag_filter_gate) {
@@ -1363,11 +1384,59 @@ function initApplication() {
 
     function editPlaylist(id) {
         const qry = `.playlist-btn-select[data-playlist-id="${id}"]`;
-        const pn = document.querySelector(qry).querySelector(".playlist-item-name");
-        const pd = document.querySelector(qry).querySelector(".playlist-item-date");
+        const el = document.querySelector(qry);
+        const pn = el.querySelector(".playlist-item-name");
+        const pd = el.querySelector(".playlist-item-date");
         document.getElementById('edit-playlist-id').value = id;
         document.getElementById('edit-playlist-name').value = pn.innerHTML;
         document.getElementById('edit-playlist-date').value = pd.innerHTML;
+
+        state.edit_playlist_tags = JSON.parse(el.dataset.tags || '[]');
+        edit_playlist_update_tags();
+    }
+
+    function edit_playlist_update_tags() {
+        const tagedit = document.getElementById('edit-playlist-tags');
+        tagedit.textContent = "";
+        state.eventTags.forEach(
+            name => {
+                const tag_tmpl = document.getElementById("edit-playlist-tag-template").content.cloneNode(true);
+                const tag_item = tag_tmpl.querySelector('.playlist-item-tag');
+                tag_item.textContent = name;
+                tag_item.dataset.name = name;
+                if (state.edit_playlist_tags.indexOf(name) >= 0) {
+                    tag_item.classList.toggle("btn-primary");
+                    tag_item.classList.toggle("btn-outline-primary");
+                }
+                tagedit.appendChild(tag_item);
+            }
+        );
+    }
+
+    function handle_editplaylist_tag_create(ev) {
+        let tagName = document.getElementById('edit-playlist-tag').value.trim();
+        if (!tagName) return;
+
+        if (state.edit_playlist_tags.indexOf(tagName) < 0) {
+            state.edit_playlist_tags.push(tagName);
+        }
+        if (state.eventTags.indexOf(tagName) < 0) {
+            state.eventTags.push(tagName);
+        }
+
+        state.socket.emit('batch', {
+            requests: [
+                { cmd: 'create_event_tag', arg: { name: tagName } },
+                { cmd: 'save_playlist', arg: {
+                    playlist_id: parseInt(document.getElementById('edit-playlist-id').value),
+                    name: document.getElementById('edit-playlist-name').value,
+                    date: document.getElementById('edit-playlist-date').value,
+                    tags: state.edit_playlist_tags,
+                }},
+            ]
+        });
+        document.getElementById('edit-playlist-tag').value = '';
+        edit_playlist_update_tags();
     }
 
     function editSong(id) {
@@ -1619,6 +1688,7 @@ function initApplication() {
             playlist_id: parseInt(document.getElementById('edit-playlist-id').value),
             name: document.getElementById('edit-playlist-name').value,
             date: document.getElementById('edit-playlist-date').value,
+            tags: state.edit_playlist_tags || [],
         }
         state.socket.emit("save_playlist", data);
         bootstrap.Modal.getInstance(document.getElementById('edit-playlist-modal')).hide();

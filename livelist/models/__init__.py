@@ -14,7 +14,7 @@ class Base(DeclarativeBase):
 db = SQLAlchemy(model_class=Base)
 
 # Import all models here to register them with SQLAlchemy
-from .database import Band, Playlist, Song, PlaylistItem, Tag
+from .database import Band, Playlist, Song, PlaylistItem, Tag, EventTag
 
 __all__ = [
     'db',
@@ -23,4 +23,5 @@ __all__ = [
     'Song',
     'PlaylistItem',
     'Tag',
+    'EventTag',
 ]

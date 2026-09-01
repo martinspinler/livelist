@@ -12,7 +12,7 @@ from sqlalchemy import and_, desc
 from dotenv import load_dotenv
 
 from .config.settings import Config
-from .models import Band, Song, Playlist, PlaylistItem, Tag, db
+from .models import Band, Song, Playlist, PlaylistItem, Tag, EventTag, db
 from .routes import views_bp
 from .routes.views import get_privileges, get_default_playlist, find_documents_by_song
 from .l10n import t as _t, get_translations, detect_language, get_supported_langs
@@ -161,6 +161,8 @@ def api_init():
     # Playlists (reuses existing function)
     playlists = get_band_playlists_data(band)
 
+    event_tags = db.session.query(EventTag).filter_by(band_id=band.id).order_by(EventTag.name).all()
+
     # Current playlist items (if active/default playlist exists)
     playlist = get_default_playlist(band)
     playlist_data = get_playlist_items(playlist) if playlist else None
@@ -168,6 +170,7 @@ def api_init():
     init_data = {
         "songlist": songlist,
         "playlists": playlists,
+        "event_tags": [t.name for t in event_tags],
         "playlist": playlist_data,
     }
 
@@ -291,6 +294,7 @@ def get_band_playlists_data(band):
             "item_count": len(p.items),
             "song_count": sum(1 for i in p.items if i.song_id is not None),
             "set_count": sum(1 for i in p.items if i.meta and json.loads(i.meta).get("is_break")) + 1,
+            "tags": [tag.name for tag in p.tags],
         }
         for p in playlists
     ]
@@ -588,7 +592,7 @@ def on_delete_playlist(data):
 
 
 @socketio.on("save_playlist")
-def on_save_playlist(data):
+def on_save_playlist(data, broadcast=True):
     band = get_band()
     playlist = get_playlist(band, data)
 
@@ -600,8 +604,22 @@ def on_save_playlist(data):
 
     playlist.name = data.get("name")
     playlist.date = date
+    req_tags = data.get("tags")
+    if req_tags is not None:
+        tags = db.session.query(EventTag).filter_by(band_id=band.id).all()
+        for t in tags:
+            if t.name not in req_tags:
+                if t in playlist.tags:
+                    playlist.tags.remove(t)
+            else:
+                if t not in playlist.tags:
+                    playlist.tags.append(t)
+
     db.session.add(playlist)
     db.session.commit()
+
+    if not broadcast:
+        return
 
     res = get_band_playlists_data(band)
     emit("playlists", res, to=f'band_{band.id}')
@@ -666,6 +684,34 @@ def create_tag(data, broadcast=True):
         get_songs()
 
 
+@socketio.on("get_event_tags")
+def get_event_tags(data={}):
+    """Send the band's event-tag vocabulary (distinct from song tags)"""
+
+    band = get_band()
+    tags = db.session.query(EventTag).filter_by(band_id=band.id).order_by(EventTag.name).all()
+    emit("event_tags", [t.name for t in tags], to=f"band_{band.id}")
+
+
+@socketio.on("create_event_tag")
+def create_event_tag(data, broadcast=True):
+    """Create a new event tag (playlist tag pool, distinct from song tags)"""
+
+    band = get_band()
+
+    name = data.get("name")
+    if not name:
+        return
+
+    tag = EventTag(band_id=band.id, name=name)
+
+    db.session.add(tag)
+    db.session.commit()
+
+    if broadcast:
+        get_event_tags()
+
+
 @socketio.on("save_song")
 def save_song(data, broadcast=True):
     """Update song"""
@@ -726,6 +772,8 @@ def create_song(data, broadcast=True):
 @socketio.on("batch")
 def batch(data):
     broadcast = data.get('broadcast', True)
+    touched_playlists = False
+    touched_event_tags = False
     for req in data.get('requests', []):
         cmd = req.get("cmd")
         arg = req.get("arg")
@@ -733,13 +781,24 @@ def batch(data):
             create_song(arg, broadcast=False)
         elif cmd == "create_tag":
             create_tag(arg, broadcast=False)
+        elif cmd == "create_event_tag":
+            create_event_tag(arg, broadcast=False)
+            touched_event_tags = True
         elif cmd == "save_song":
             save_song(arg, broadcast=False)
+        elif cmd == "save_playlist":
+            on_save_playlist(arg, broadcast=False)
+            touched_playlists = True
         elif cmd == "add_song":
             add_playlist_item(arg, broadcast=False)
 
     if broadcast:
         get_songs()
+        if touched_playlists:
+            band = get_band()
+            emit("playlists", get_band_playlists_data(band), to=f'band_{band.id}')
+        if touched_event_tags:
+            get_event_tags()
 
 
 # Error handlers

@@ -54,7 +54,7 @@
 <div class="container-fluid mt-3">
     <div class="card mb-3">
         <div class="card-body">
-            <details {% if flt_search or flt_from or flt_to or flt_sort != "last" %}open{% endif %}>
+            <details {% if flt_search or flt_from or flt_to or flt_tag_states or flt_sort != "last" %}open{% endif %}>
                 <summary class="card-title" style="cursor: pointer">{{ _('stats_filter') }}</summary>
                 <form action="{{ url_for('views.stats_view', band=band.addr) }}" method="GET" class="mt-3">
                     <fieldset class="mb-3">
@@ -75,6 +75,43 @@
                             <label class="form-check-label" for="sort-name">{{ _('stats_sort_name') }}</label>
                         </div>
                     </fieldset>
+                    {% if band_tags %}
+                    <fieldset class="mb-3">
+                        <legend class="col-form-label pt-0">{{ _('stats_tags') }}</legend>
+                        {% for tag in band_tags %}
+                        {% set tag_state = flt_tag_states.get(tag.id, "off") %}
+                        <div class="btn-group btn-group-sm mb-1 me-2" role="group" aria-label="{{ tag.name }}">
+                            <input type="radio" class="btn-check" name="tag_{{ tag.id }}" id="tag-{{ tag.id }}-off"
+                                value="off" {% if tag_state == "off" %}checked{% endif %}>
+                            <label class="btn btn-outline-secondary" for="tag-{{ tag.id }}-off">{{ tag.name }}</label>
+
+                            <input type="radio" class="btn-check" name="tag_{{ tag.id }}"
+                                id="tag-{{ tag.id }}-include" value="include"
+                                {% if tag_state == "include" %}checked{% endif %}>
+                            <label class="btn btn-outline-success" for="tag-{{ tag.id }}-include"
+                                title="{{ _('stats_tag_include') }}"><i class="bi bi-check-lg"></i></label>
+
+                            <input type="radio" class="btn-check" name="tag_{{ tag.id }}"
+                                id="tag-{{ tag.id }}-exclude" value="exclude"
+                                {% if tag_state == "exclude" %}checked{% endif %}>
+                            <label class="btn btn-outline-danger" for="tag-{{ tag.id }}-exclude"
+                                title="{{ _('stats_tag_exclude') }}"><i class="bi bi-x-lg"></i></label>
+                        </div>
+                        {% endfor %}
+                        <div class="mt-1">
+                            <div class="form-check form-check-inline">
+                                <input class="form-check-input" type="radio" name="tagcombine" id="tagcombine-or"
+                                    value="OR" {% if flt_tag_combine != "AND" %}checked{% endif %}>
+                                <label class="form-check-label" for="tagcombine-or">{{ _('filter_or') }}</label>
+                            </div>
+                            <div class="form-check form-check-inline">
+                                <input class="form-check-input" type="radio" name="tagcombine" id="tagcombine-and"
+                                    value="AND" {% if flt_tag_combine == "AND" %}checked{% endif %}>
+                                <label class="form-check-label" for="tagcombine-and">{{ _('filter_and') }}</label>
+                            </div>
+                        </div>
+                    </fieldset>
+                    {% endif %}
                     <div class="row g-2 align-items-end">
                         <div class="col-auto">
                             <label for="search" class="form-label">{{ _('stats_search_label') }}</label>

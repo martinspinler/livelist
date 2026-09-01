@@ -16,7 +16,7 @@ from datetime import date
 
 
 
-from ..models import Band, Playlist, PlaylistItem, Song, db
+from ..models import Band, Playlist, PlaylistItem, Song, EventTag, db
 from ..songfind import (
     Store,
     build_store,
@@ -341,6 +341,19 @@ def stats_view(band):
     search = request.args.get("search", "").strip()
     date_from = request.args.get("from", "")
     date_to = request.args.get("to", "")
+    tag_combine = request.args.get("tagcombine", "OR")
+    if tag_combine not in ("AND", "OR"):
+        tag_combine = "OR"
+
+    band_tags = db.session.query(EventTag).filter_by(band_id=band.id).order_by(EventTag.name).all()
+
+    tag_states = {}
+    for tag in band_tags:
+        state = request.args.get(f"tag_{tag.id}")
+        if state in ("include", "exclude"):
+            tag_states[tag.id] = state
+    include_tags = [t.name for t in band_tags if tag_states.get(t.id) == "include"]
+    exclude_tags = [t.name for t in band_tags if tag_states.get(t.id) == "exclude"]
 
     q = (
         db.session.query(Playlist.date, Playlist.name.label("playlist_name"), Song.id, Song.name)
@@ -360,6 +373,16 @@ def stats_view(band):
             q = q.filter(Playlist.date <= date.fromisoformat(date_to))
         except ValueError:
             date_to = ""
+    if exclude_tags:
+        q = q.filter(~Playlist.tags.any(EventTag.name.in_(exclude_tags)))
+    if include_tags:
+        if tag_combine == "AND":
+            # Event must carry every included tag.
+            for name in include_tags:
+                q = q.filter(Playlist.tags.any(EventTag.name == name))
+        else:
+            # Event must carry at least one included tag.
+            q = q.filter(Playlist.tags.any(EventTag.name.in_(include_tags)))
     q = q.order_by(Playlist.date.desc())
 
     days: dict[int, DayInfo] = {}
@@ -403,6 +426,9 @@ def stats_view(band):
         flt_search=search,
         flt_from=date_from,
         flt_to=date_to,
+        flt_tag_states=tag_states,
+        flt_tag_combine=tag_combine,
+        band_tags=band_tags,
     )
 
 

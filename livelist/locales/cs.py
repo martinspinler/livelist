@@ -12,6 +12,8 @@ TRANSLATIONS: dict[str, str] = {
     "nav_expand_all":     "Rozbalit všechny sety",
     "nav_scroll_anchor":  "Přejít na kotvu",
     "nav_help":           "Nápověda",
+    "nav_stats":          "Statistiky",
+    "nav_back":           "Zpět",
 
     # ---- Přepínač režimu ----
     "mode_play":          "Hraní",
@@ -135,4 +137,20 @@ TRANSLATIONS: dict[str, str] = {
     "feature_sets_desc":        "Organizujte playlist do přehledných setů s možností kopírováním názvů písní schránky.",
     "feature_live_title":       "Zobrazení not",
     "feature_live_desc":        "Zobrazení PDF s notami nebo akordy podobně jako v iReal aplikaci.",
+
+    # ---- Stránka statistik ----
+    "stats_title":          "Statistiky",
+    "stats_filter":         "Filtrování",
+    "stats_sort":           "Řazení",
+    "stats_sort_last":      "Od naposledy hrané",
+    "stats_sort_most":      "Od nejčastěji hrané",
+    "stats_sort_name":      "Podle názvu",
+    "stats_search_label":   "Název písně",
+    "stats_search_ph":      "Filtrovat podle názvu...",
+    "stats_from":           "Od",
+    "stats_to":             "Do",
+    "stats_apply":          "Filtrovat",
+    "stats_col_song":       "Píseň",
+    "stats_col_count":      "Počet",
+    "stats_empty":          "Zatím žádná historie playlistů.",
 }

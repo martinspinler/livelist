@@ -182,6 +182,7 @@
                     <li><button class="dropdown-item" id="numbering-toggle" title="{{ _('numbering_toggle') }}">
                             <span id="numbering-label">1..N</span>
                             <i id="numbering-icon" class="bi bi-arrow-right ms-1"></i></button></li>
+                    <li><a class="dropdown-item bi bi-bar-chart" href="{{ url_for('views.stats_view', band=band.addr) }}">{{ _('nav_stats') }}</a></li>
                     <li><hr class="dropdown-divider"></li>
                     <li><a class="dropdown-item bi bi-box-arrow-right" href="{{ home_url }}">{{ _('nav_switch_band') }}</a></li>
                     <li><button class="dropdown-item bi bi-question-circle" data-bs-toggle="modal"

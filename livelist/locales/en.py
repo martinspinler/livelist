@@ -12,6 +12,8 @@ TRANSLATIONS: dict[str, str] = {
     "nav_expand_all":     "Expand all sets",
     "nav_scroll_anchor":  "Scroll to anchor",
     "nav_help":           "Help",
+    "nav_stats":          "Statistics",
+    "nav_back":           "Back",
 
     # ---- Mode toggle ----
     "mode_play":          "Play",
@@ -135,4 +137,20 @@ TRANSLATIONS: dict[str, str] = {
     "feature_sets_desc":        "Organize your playlist into sets for better clarity, with the ability to copy song names to the clipboard.",
     "feature_live_title":       "Sheets Screen",
     "feature_live_desc":        "Display the sheet document in PDF or iReal-like screen.",
+
+    # ---- Statistics page ----
+    "stats_title":          "Statistics",
+    "stats_filter":         "Filter",
+    "stats_sort":           "Sort by",
+    "stats_sort_last":      "Last played",
+    "stats_sort_most":      "Most played",
+    "stats_sort_name":      "Name",
+    "stats_search_label":   "Song name",
+    "stats_search_ph":      "Filter by song name...",
+    "stats_from":           "From",
+    "stats_to":             "To",
+    "stats_apply":          "Apply",
+    "stats_col_song":       "Song",
+    "stats_col_count":      "Count",
+    "stats_empty":          "No playlist history yet.",
 }

@@ -5,6 +5,7 @@ HTML views for Livelist
 import os
 import json
 import subprocess
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Optional, TypedDict
 
@@ -299,6 +300,109 @@ def view_band_noredirect(band):
     """
     return render_template(
         "band.html", band=band, playlist=playlist, date_today=date_today, jinja_script=jinja_script, auth_key=key
+    )
+
+
+@dataclass
+class SongStatRow:
+    """One row of the /stats matrix: a song and which playlist dates it was played on."""
+    song_id: int
+    name: str
+    count: int
+    days: list[int]
+
+
+@dataclass
+class DayInfo:
+    """One column of the /stats matrix: a playlist date and the event name(s) on it."""
+    date: date
+    names: list[str]
+
+
+def _minmax(dmin: Optional[int], dmax: Optional[int], d: int) -> tuple[int, int]:
+    dmin = d if dmin is None or d < dmin else dmin
+    dmax = d if dmax is None or d > dmax else dmax
+    return dmin, dmax
+
+
+@views_bp.route("/band/<band>/stats/")
+def stats_view(band):
+    """Song x playlist-date matrix — which songs were played on which dates.
+    """
+    key = check_privileges(band)
+    if key is None:
+        return make_response(redirect('/?auth_failed'))
+
+    band = _get_current_band(band)
+    if band is None:
+        return make_response(redirect('/?auth_failed'))
+
+    sort_type = request.args.get("sort", "last")
+    search = request.args.get("search", "").strip()
+    date_from = request.args.get("from", "")
+    date_to = request.args.get("to", "")
+
+    q = (
+        db.session.query(Playlist.date, Playlist.name.label("playlist_name"), Song.id, Song.name)
+        .join(PlaylistItem, PlaylistItem.playlist_id == Playlist.id)
+        .join(Song, Song.id == PlaylistItem.song_id)
+        .filter(Playlist.band_id == band.id)
+    )
+    if search:
+        q = q.filter(Song.name.ilike(f"%{search}%"))
+    if date_from:
+        try:
+            q = q.filter(Playlist.date >= date.fromisoformat(date_from))
+        except ValueError:
+            date_from = ""
+    if date_to:
+        try:
+            q = q.filter(Playlist.date <= date.fromisoformat(date_to))
+        except ValueError:
+            date_to = ""
+    q = q.order_by(Playlist.date.desc())
+
+    days: dict[int, DayInfo] = {}
+    matrix: dict[int, SongStatRow] = {}
+    dmin, dmax = None, None
+
+    for pdate, playlist_name, song_id, song_name in q:
+        day = pdate.toordinal()
+        dmin, dmax = _minmax(dmin, dmax, day)
+        info = days.get(day)
+        if info is None:
+            info = DayInfo(pdate, [])
+            days[day] = info
+        if playlist_name and playlist_name not in info.names:
+            info.names.append(playlist_name)
+
+        row = matrix.get(song_id)
+        if row is None:
+            matrix[song_id] = SongStatRow(song_id, song_name, 1, [day])
+        else:
+            if row.days[-1] != day:
+                row.days.append(day)
+            row.count += 1
+
+    sort_keys = {
+        "most": ((lambda x: x[1].count), True),
+        "name": ((lambda x: x[1].name.lower()), False),
+    }
+    key_fn, rev = sort_keys.get(sort_type, (None, None))
+    if key_fn is not None:
+        matrix = dict(sorted(matrix.items(), key=key_fn, reverse=rev))
+
+    return render_template(
+        "stats.html",
+        band=band,
+        matrix=matrix,
+        days=days,
+        dmin=dmin,
+        dmax=dmax,
+        flt_sort=sort_type,
+        flt_search=search,
+        flt_from=date_from,
+        flt_to=date_to,
     )
 
 

@@ -55,6 +55,12 @@ def _name_candidates(song: Song) -> list[str]:
     return name_candidates
 
 
+def _pattern_fields(song: Song) -> dict:
+    """Extra song values for pattern placeholders (besides {name} and
+    {instrument}); an empty value counts as missing."""
+    return {"user_id": song.user_id or None}
+
+
 def find_documents_by_song(song: Song) -> list:
     """Find all unique documents for a song by iterating patterns × instruments.
 
@@ -63,7 +69,7 @@ def find_documents_by_song(song: Song) -> list:
     probing is a client concern.
     """
     st = _get_store(song.band)
-    return _find_documents(_name_candidates(song), st, orientation=None)
+    return _find_documents(_name_candidates(song), st, orientation=None, fields=_pattern_fields(song))
 
 
 def resolve_document(song: Song, pattern_id: str, instr_id: str) -> Optional[str]:
@@ -74,7 +80,7 @@ def resolve_document(song: Song, pattern_id: str, instr_id: str) -> Optional[str
     absolute file path, or None.
     """
     st = _get_store(song.band)
-    return _resolve_document_path(_name_candidates(song), st, pattern_id, instr_id)
+    return _resolve_document_path(_name_candidates(song), st, pattern_id, instr_id, fields=_pattern_fields(song))
 
 
 def get_privileges(band_name, key):

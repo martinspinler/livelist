@@ -14,8 +14,9 @@ specific pattern/instrument pair, e.g. for serving a chosen file).
 """
 
 import os
+import string
 from dataclasses import dataclass, field
-from typing import Optional
+from typing import Any, Optional
 
 
 @dataclass
@@ -40,6 +41,20 @@ class Store:
     patterns: dict[str, Pattern]
     instruments: dict[str, Instrument]
     prefix: str
+
+
+def format_pattern(template: str, **fields: Any) -> Optional[str]:
+    """Format a pattern template with ``name``, ``instrument`` and extra
+    song fields (e.g. ``user_id``).
+
+    Returns None when the template uses a field that is missing (None) for
+    the song, e.g. ``{user_id}`` for a song without one: such a pattern is
+    skipped instead of producing a bogus path or raising KeyError.
+    """
+    for _, fname, _, _ in string.Formatter().parse(template):
+        if fname and fields.get(fname) is None:
+            return None
+    return template.format(**fields)
 
 
 def build_store(config: dict, prefix: str = "") -> Store:
@@ -134,6 +149,7 @@ def find_documents(
     name_candidates: list[str],
     store: Store,
     orientation: Optional[str] = None,
+    fields: Optional[dict[str, Any]] = None,
 ) -> list:
     """Find all unique documents for a song by iterating patterns x instruments.
 
@@ -143,6 +159,10 @@ def find_documents(
     ``orientation`` may be ``'L'`` or ``'P'`` to prefer landscape/portrait
     instrument-suffix variants (prepended, highest priority); ``None`` keeps
     the configured suffixes as-is.
+
+    ``fields`` are extra song values for the pattern placeholders besides
+    ``{name}`` and ``{instrument}``, e.g. ``{"user_id": song.user_id}``.
+    A pattern using a field that is missing for the song is skipped.
 
     Returns a list of document dicts, each with:
       pattern_id          - id of the pattern that produced this file
@@ -170,7 +190,9 @@ def find_documents(
                 matched_rel = None
                 matched_abs = None
                 for name in name_candidates:
-                    candidate_rel = template.format(name=name, instrument=suffix)
+                    candidate_rel = format_pattern(template, **(fields or {}), name=name, instrument=suffix)
+                    if candidate_rel is None:
+                        continue
                     candidate_abs = store.prefix + candidate_rel
                     if os.path.isfile(candidate_abs):
                         matched_rel = candidate_rel
@@ -226,12 +248,13 @@ def resolve_document(
     store: Store,
     pattern_id: str,
     instr_id: str,
+    fields: Optional[dict[str, Any]] = None,
 ) -> Optional[str]:
     """Resolve a specific document file for serving.
 
     Given a pattern_id and instr_id, tries that instrument's suffixes with
     the pattern template until an existing file is found. Returns the
-    absolute file path, or None.
+    absolute file path, or None. ``fields`` as in :func:`find_documents`.
     """
     pat = store.patterns.get(pattern_id)
     instr = store.instruments.get(instr_id)
@@ -242,7 +265,9 @@ def resolve_document(
     template = pat.pattern
     for suffix in instr.patterns:
         for name in name_candidates:
-            candidate_rel = template.format(name=name, instrument=suffix)
+            candidate_rel = format_pattern(template, **(fields or {}), name=name, instrument=suffix)
+            if candidate_rel is None:
+                continue
             candidate_abs = store.prefix + candidate_rel
             if os.path.isfile(candidate_abs):
                 return candidate_abs

@@ -41,7 +41,7 @@ Bands authenticate via a simple password stored per-band. The auth state is kept
 
 Each band has its own sheet-music layout, stored as JSON in the band's `sheet_store` field. The configuration has two parts:
 
-- **Patterns** — where to find a file for a song. Each pattern sets a render type (`pdf` or `text`), a path template built from the `{name}` and `{instrument}` placeholders, and a display label.
+- **Patterns** — where to find a file for a song. Each pattern sets a render type (`pdf` or `text`), a path template built from the `{name}`, `{instrument}` and `{user_id}` placeholders (a pattern using `{user_id}` is skipped for songs without one), and a display label.
 - **Instruments** — the filename suffixes to try for each instrument (e.g. `-Piano`, `-Voice`) and the order in which patterns are preferred for that instrument.
 
 Files are resolved relative to the global `LIVELIST_SHEET_STORE_PATH` directory (an optional `{band}` placeholder is replaced with the band's `addr`). See `examples/sheet-store-band.json` for a full reference layout.
